@@ -8,11 +8,11 @@
   (:require
    ["opentype.js" :as ot]
    [app.common.data :as d]
+   [app.common.data.macros :as dm]
    [app.common.logging :as log]
    [app.common.media :as cm]
-   [app.common.spec :as us]
    [app.common.uuid :as uuid]
-   [app.main.data.messages :as dm]
+   [app.main.data.messages :as msg]
    [app.main.fonts :as fonts]
    [app.main.repo :as rp]
    [app.main.store :as st]
@@ -182,7 +182,7 @@
                     #(when
                       (not-empty %)
                        (st/emit!
-                        (dm/error
+                        (msg/error
                          (if (> (count %) 1)
                            (tr "errors.bad-font-plural" (str/join ", " %))
                            (tr "errors.bad-font" (first %)))))))
@@ -245,8 +245,8 @@
 
 (defn update-font
   [{:keys [id name] :as params}]
-  (us/assert ::us/uuid id)
-  (us/assert ::us/not-empty-string name)
+  (dm/assert! (uuid? id))
+  (dm/assert! (string? name))
   (ptk/reify ::update-font
     ptk/UpdateEvent
     (update [_ state]
@@ -269,7 +269,7 @@
 (defn delete-font
   "Delete all variants related to the provided `font-id`."
   [font-id]
-  (us/assert ::us/uuid font-id)
+  (dm/assert! (uuid? font-id))
   (ptk/reify ::delete-font
     ptk/UpdateEvent
     (update [_ state]
@@ -285,7 +285,7 @@
 
 (defn delete-font-variant
   [id]
-  (us/assert ::us/uuid id)
+  (dm/assert! (uuid? id))
   (ptk/reify ::delete-font-variants
     ptk/UpdateEvent
     (update [_ state]

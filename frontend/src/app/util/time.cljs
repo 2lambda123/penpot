@@ -164,11 +164,11 @@
 (extend-protocol IPrintWithWriter
   DateTime
   (-pr-writer [p writer _]
-    (-write writer (str/fmt "#stks/datetime \"%s\"" (format p :iso))))
+    (-write writer (str/fmt "#app/instant \"%s\"" (format p :iso))))
 
   Duration
   (-pr-writer [p writer _]
-    (-write writer (str/fmt "#stks/duration \"%s\"" (format p :iso)))))
+    (-write writer (str/fmt "#app/duration \"%s\"" (format p :iso)))))
 
 (defn- resolve-format
   [v]
