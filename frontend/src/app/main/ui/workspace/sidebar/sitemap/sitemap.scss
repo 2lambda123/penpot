@@ -34,7 +34,7 @@
         height: $s-24;
         width: $s-24;
         padding: 0 $s-4 0 $s-8;
-        border-radius: $br8;
+        border-radius: $br-8;
         svg {
           @extend .button-icon;
           height: $s-12;
@@ -53,7 +53,7 @@
       @extend .button-primary;
       height: $s-24;
       width: $s-24;
-      border-radius: $br8;
+      border-radius: $br-8;
       svg {
         @extend .button-icon;
         height: $s-12;
@@ -67,7 +67,7 @@
       height: $s-20;
       padding: $s-4 $s-6;
       border: 1px solid var(--tag-background-color);
-      border-radius: $br6;
+      border-radius: $br-6;
       color: var(--tag-background-color);
     }
   }
@@ -145,7 +145,7 @@
               @include flexCenter;
               width: $s-24;
               height: 100%;
-              opacity: 0;
+              opacity: $op-0;
               svg {
                 @extend .button-icon-small;
                 height: $s-12;
@@ -168,7 +168,7 @@
             max-width: calc(var(--parent-size) - (var(--depth) * var(--layer-indentation-size)));
             margin: 0;
             padding-left: $s-6;
-            border-radius: $br8;
+            border-radius: $br-8;
             border: 1px solid var(--input-border-color-focus);
             outline: none;
             background-color: transparent;
@@ -210,7 +210,7 @@
             color: var(--layer-row-foreground-color-hover);
             background-color: var(--layer-row-background-color-hover);
             .page-actions button {
-              opacity: 1;
+              opacity: $op-10;
               svg {
                 stroke: var(--layer-row-foreground-color-hover);
               }
@@ -226,7 +226,7 @@
             border: 1px solid var(--layer-row-border-color-focus);
             outline: none;
             .page-actions button {
-              opacity: 1;
+              opacity: $op-10;
             }
           }
         }
@@ -234,7 +234,7 @@
           .element-list-body {
             outline: none;
             .page-actions button {
-              opacity: 1;
+              opacity: $op-10;
             }
           }
         }
@@ -243,7 +243,7 @@
           .element-list-body {
             color: var(--layer-row-foreground-color-hidden);
             background-color: var(--layer-row-background-color-hidden);
-            opacity: 70%;
+            opacity: $op-7;
             .page-actions button {
               svg {
                 stroke: var(--layer-row-foreground-color-hidden);

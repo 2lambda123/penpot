@@ -62,10 +62,10 @@
         .absolute {
           position: absolute;
           background-color: var(--layer-row-foreground-color);
-          opacity: 0.4;
+          opacity: $op-4;
           width: $s-12;
           height: $s-12;
-          border-radius: $br2;
+          border-radius: $br-2;
         }
       }
     }
@@ -89,9 +89,9 @@
         .toggle-element,
         .block-element {
           display: flex;
-          opacity: 0;
+          opacity: $op-0;
           &.selected {
-            opacity: 100%;
+            opacity: $op-10;
           }
         }
       }
@@ -113,15 +113,15 @@
       .button-content {
         .toggle-content {
           svg {
-            opacity: 0.7;
+            opacity: $op-7;
           }
         }
         .icon-shape {
           svg {
-            opacity: 0.7;
+            opacity: $op-7;
           }
           .absolute {
-            opacity: 0.1;
+            opacity: $op-1;
           }
         }
       }
@@ -129,7 +129,7 @@
         .toggle-element,
         .block-element {
           svg {
-            opacity: 0.7;
+            opacity: $op-7;
           }
         }
       }
@@ -137,27 +137,27 @@
   }
   &:hover {
     --context-hover-color: var(--layer-row-foreground-color-hover);
-    --context-hover-opacity: 1;
+    --context-hover-opacity: $op-10;
     background-color: var(--layer-row-background-color-hover);
     &.hidden {
-      opacity: 1;
+      opacity: $op-10;
     }
     .element-list-body {
       .button-content {
         .toggle-content {
           background-color: var(--layer-row-background-color-hover);
           svg {
-            opacity: 1;
+            opacity: $op-10;
             stroke: var(--layer-row-foreground-color-hover);
           }
         }
         .icon-shape {
-          opacity: 1;
+          opacity: $op-10;
           svg {
             stroke: var(--layer-row-foreground-color-hover);
           }
           & .absolute {
-            opacity: 0.4;
+            opacity: $op-4;
             background-color: var(--layer-row-foreground-color-hover);
           }
         }
@@ -168,14 +168,14 @@
         .block-element {
           display: flex;
           svg {
-            opacity: 1;
+            opacity: $op-10;
             stroke: var(--layer-row-foreground-color-hover);
           }
         }
         &.selected {
           .toggle-element,
           .block-element {
-            opacity: 1;
+            opacity: $op-10;
           }
         }
       }
@@ -221,9 +221,9 @@
           .toggle-element,
           .block-element {
             display: flex;
-            opacity: 1;
+            opacity: $op-10;
             &.selected {
-              opacity: 1;
+              opacity: $op-10;
             }
           }
         }
@@ -272,12 +272,12 @@
       .element-list-body {
         .button-content {
           .toggle-content {
-            opacity: 0.7;
+            opacity: $op-7;
           }
           .icon-shape {
-            opacity: 0.7;
+            opacity: $op-7;
             .absolute {
-              opacity: 0.1;
+              opacity: $op-1;
             }
           }
         }
@@ -285,7 +285,7 @@
           .toggle-element,
           .block-element {
             svg {
-              opacity: 0.7;
+              opacity: $op-7;
             }
           }
         }
@@ -294,12 +294,12 @@
         .element-list-body {
           .button-content {
             .toggle-content {
-              opacity: 1;
+              opacity: $op-10;
             }
             .icon-shape {
-              opacity: 1;
+              opacity: $op-10;
               & .absolute {
-                opacity: 0.4;
+                opacity: $op-4;
               }
             }
           }
@@ -307,7 +307,7 @@
             .toggle-element,
             .block-element {
               svg {
-                opacity: 1;
+                opacity: $op-10;
               }
             }
           }
@@ -326,7 +326,7 @@
   &:hover {
     background-color: var(--layer-row-background-color-hover);
     &.hidden {
-      opacity: 1;
+      opacity: $op-10;
     }
     .element-list-body {
       .button-content {
@@ -356,7 +356,7 @@
         &.selected {
           .toggle-element,
           .block-element {
-            opacity: 100%;
+            opacity: $op-10;
           }
         }
       }

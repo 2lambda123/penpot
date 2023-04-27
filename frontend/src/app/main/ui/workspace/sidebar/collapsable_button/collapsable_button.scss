@@ -12,14 +12,14 @@
   top: $s-48;
   left: $s-48;
   padding: $s-8;
-  border-radius: $br8;
+  border-radius: $br-8;
   background: var(--color-background-primary);
 }
 .collapsed-title {
   @include flexCenter;
   height: $s-32;
   width: $s-24;
-  border-radius: $br8;
+  border-radius: $br-8;
   background: var(--color-background-secondary);
 }
 .collapsed-button {
@@ -27,7 +27,7 @@
   height: $s-24;
   width: $s-16;
   padding: 0;
-  border-radius: $br5;
+  border-radius: $br-5;
   svg {
     @include flexCenter;
     height: $s-12;

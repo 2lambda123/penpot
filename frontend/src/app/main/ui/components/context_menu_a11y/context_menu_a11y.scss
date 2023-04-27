@@ -9,13 +9,13 @@
 .context-menu {
   position: relative;
   visibility: hidden;
-  opacity: 0;
+  opacity: $op-0;
   z-index: $z-index-2;
 
   &.is-open {
     position: relative;
     display: block;
-    opacity: 1;
+    opacity: $op-10;
     visibility: visible;
   }
   &.fixed {
@@ -28,9 +28,9 @@
     left: calc(-1 * $s-6);
     max-height: $s-480;
     min-width: $s-96;
-    margin: 0;
+    margin: $s-0;
     padding: $s-4;
-    border-radius: $br8;
+    border-radius: $br-8;
     background-color: var(--menu-background-color);
     box-shadow: 0px 0px $s-12 0px var(--menu-shadow-color);
     overflow: auto;
@@ -52,7 +52,7 @@
         height: $s-28;
         width: 100%;
         padding: $s-6;
-        border-radius: $br8;
+        border-radius: $br-8;
         white-space: nowrap;
         color: var(--menu-foreground-color);
         &.submenu {

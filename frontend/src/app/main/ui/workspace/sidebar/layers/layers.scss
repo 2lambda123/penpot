@@ -29,7 +29,7 @@
       @extend .button-primary;
       height: $s-24;
       width: $s-24;
-      border-radius: $br8;
+      border-radius: $br-8;
       margin-right: $s-12;
       svg {
         @extend .button-icon-small;
@@ -46,7 +46,7 @@
         width: 100%;
         margin-right: $s-4;
         margin-bottom: $s-4;
-        border-radius: $br8;
+        border-radius: $br-8;
         background-color: var(--color-background-primary);
         .filter-button {
           @include flexCenter;
@@ -55,7 +55,7 @@
           width: $s-32;
           margin: 0;
           border: 1px solid var(--color-background-tertiary);
-          border-radius: $br8 $br2 $br2 $br8;
+          border-radius: $br-8 $br-2 $br-2 $br-8;
           background-color: var(--color-background-tertiary);
           svg {
             height: $s-16;
@@ -85,7 +85,7 @@
           height: $s-32;
           width: 100%;
           border: 1px solid var(--color-background-tertiary);
-          border-radius: $br2 $br8 $br8 $br2;
+          border-radius: $br-2 $br-8 $br-8 $br-2;
           background-color: var(--color-background-tertiary);
           input {
             width: 100%;
@@ -116,7 +116,7 @@
 
           .clear {
             @extend .button-secondary;
-            border-radius: $br8;
+            border-radius: $br-8;
             height: 100%;
             svg {
               @extend .button-icon-small;
@@ -130,7 +130,7 @@
         height: $s-32;
         width: $s-28;
         margin-bottom: $s-4;
-        border-radius: $br8;
+        border-radius: $br-8;
         svg {
           @extend .button-icon-small;
         }
@@ -171,7 +171,7 @@
           height: $s-20;
           padding: $s-4 $s-6;
           border: 1px solid var(--tag-background-color);
-          border-radius: $br6;
+          border-radius: $br-6;
           color: var(--tag-background-color);
         }
       }
@@ -189,7 +189,7 @@
       gap: $s-4;
       height: $s-24;
       margin: $s-2 0;
-      border-radius: $br6;
+      border-radius: $br-6;
       background-color: var(--pill-background-color);
       cursor: pointer;
       .layer-filter-icon,
@@ -216,7 +216,7 @@
     gap: $s-4;
     width: $s-192;
     padding: $s-4;
-    border-radius: $br8;
+    border-radius: $br-8;
     background-color: var(--menu-background-color);
     z-index: $z-index-4;
     box-shadow: 0px 0px 10px 0px var(--menu-shadow-color);
@@ -227,7 +227,7 @@
       justify-content: space-between;
       width: 100%;
       padding: $s-6;
-      border-radius: $br8;
+      border-radius: $br-8;
 
       .filter-menu-item-name-wrapper {
         display: flex;
@@ -295,6 +295,7 @@
     flex-direction: column;
     height: 100%;
     width: 100%;
+    border-radius: $br-8;
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-gutter: stable;

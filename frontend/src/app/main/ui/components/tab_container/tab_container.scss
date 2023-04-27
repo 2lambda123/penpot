@@ -28,7 +28,7 @@
   height: $s-32;
   margin: $s-2 $s-2 0 $s-2;
   padding: $s-2;
-  border-radius: $br8;
+  border-radius: $br-8;
   background: var(--color-background-secondary);
   cursor: pointer;
   font-size: $fs12;
@@ -44,7 +44,7 @@
       height: $s-28;
       width: 100%;
       margin: 0;
-      border-radius: $br5;
+      border-radius: $br-5;
       background-color: transparent;
       color: var(--tab-foreground-color);
 
@@ -64,7 +64,7 @@
     height: 100%;
     width: $s-24;
     padding: 0;
-    border-radius: $br5;
+    border-radius: $br-5;
     svg {
       @include flexCenter;
       height: 12px;

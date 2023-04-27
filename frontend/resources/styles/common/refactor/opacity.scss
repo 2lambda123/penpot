@@ -4,13 +4,9 @@
 //
 // Copyright (c) KALEIDOS INC
 
-// Border radius
-$br-0: $s-0;
-$br-2: $s-2;
-$br-4: $s-4;
-$br-5: 0.313rem;
-$br-6: $s-6;
-$br-8: $s-8;
-$br-10: calc($s-8 + $s-2);
-$br-12: $s-12;
-$br-circle: 50%;
+// Opacity values
+$op-0: 0;
+$op-1: 0.1;
+$op-4: 0.3;
+$op-7: 0.7;
+$op-10: 1;

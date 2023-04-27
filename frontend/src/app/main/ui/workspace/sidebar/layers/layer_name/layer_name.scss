@@ -18,11 +18,11 @@
   &.type-comp {
     color: var(--context-hover-color, var(--layer-row-component-foreground-color));
     &.hidden {
-      opacity: var(--context-hover-opacity, 0.7);
+      opacity: var(--context-hover-opacity, $op-7);
     }
   }
   &.hidden {
-    opacity: var(--context-hover-opacity, 0.7);
+    opacity: var(--context-hover-opacity, $op-7);
   }
 }
 .element-name-input {
@@ -33,7 +33,7 @@
   max-width: calc(var(--parent-size) - (var(--depth) * var(--layer-indentation-size)));
   margin: 0;
   padding-left: $s-6;
-  border-radius: $br8;
+  border-radius: $br-8;
   border: 1px solid var(--input-border-color-focus);
   outline: none;
   background-color: transparent;

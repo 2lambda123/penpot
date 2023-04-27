@@ -128,6 +128,17 @@
     (if (= type :linear)
       (str/fmt "linear-gradient(to bottom, %s)" stops-css)
       (str/fmt "radial-gradient(circle, %s)" stops-css))))
+(defn gradient2->css [{:keys [type stops]}]
+  (let [parse-stop
+        (fn [{:keys [offset color opacity]}]
+          (let [[r g b] (hex->rgb color)]
+            (str/fmt "rgba(%s, %s, %s, %s) %s" r g b opacity (str (* offset 100) "%"))))
+
+        stops-css (str/join "," (map parse-stop stops))]
+
+    (if (= type :linear)
+      (str/fmt "linear-gradient(to right, %s)" stops-css)
+      (str/fmt "radial-gradient(circle, %s)" stops-css))))
 
 ;; TODO: REMOVE `VALUE` WHEN COLOR IS INTEGRATED
 (defn color->background [{:keys [color opacity gradient value]}]
