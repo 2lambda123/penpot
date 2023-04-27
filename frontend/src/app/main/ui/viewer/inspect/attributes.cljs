@@ -8,6 +8,8 @@
   (:require
    [app.common.geom.shapes :as gsh]
    [app.main.ui.hooks :as hooks]
+   [app.main.ui.viewer.inspect.annotation :refer [annotation]]
+   [app.main.data.workspace.annotation-helpers :as dwah]
    [app.main.ui.viewer.inspect.attributes.blur :refer [blur-panel]]
    [app.main.ui.viewer.inspect.attributes.fill :refer [fill-panel]]
    [app.main.ui.viewer.inspect.attributes.image :refer [image-panel]]
@@ -19,7 +21,8 @@
    [app.main.ui.viewer.inspect.attributes.svg :refer [svg-panel]]
    [app.main.ui.viewer.inspect.attributes.text :refer [text-panel]]
    [app.main.ui.viewer.inspect.exports :refer [exports]]
-   [rumext.v2 :as mf]))
+   [rumext.v2 :as mf]
+   [app.main.refs :as refs]))
 
 (def type->options
   {:multiple [:fill :stroke :image :text :shadow :blur :layout-flex-item]
@@ -37,7 +40,12 @@
         shapes  (mf/with-memo [shapes]
                   (mapv #(gsh/translate-to-frame % frame) shapes))
         type    (if (= (count shapes) 1) (-> shapes first :type) :multiple)
-        options (type->options type)]
+        options (type->options type)
+        content (when (= (count shapes) 1)
+                  (if (= from :workspace)
+                    (dwah/get-main-annotation (first shapes))
+                    (dwah/get-main-annotation-viewer (first shapes))))]
+
     [:div.element-options
      (for [[idx option] (map-indexed vector options)]
        [:> (case option
@@ -55,6 +63,8 @@
          :shapes shapes
          :frame frame
          :from from}])
+     (when content
+       [:& annotation {:content content}])
      [:& exports
       {:shapes shapes
        :type type
