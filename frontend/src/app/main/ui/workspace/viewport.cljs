@@ -263,7 +263,7 @@
     (hooks/setup-active-frames base-objects hover-ids selected active-frames zoom transform vbox)
     (hooks/setup-page-loaded page-id)
 
-    [:div.viewport
+    [:div.viewport {:style #js {"--zoom" zoom}}
      [:div.viewport-overlays
       ;; The behaviour inside a foreign object is a bit different that in plain HTML so we wrap
       ;; inside a foreign object "dummy" so this awkward behaviour is take into account
