@@ -96,18 +96,17 @@
                  ;; If the useTypoMetrics is not set, Firefox will also use metrics from the hhea table.
                  ;; On Windows, all browsers use the usWin metrics, but respect the useTypoMetrics setting and if set will use the OS/2 values.
 
-                  hhea-ascender   (abs (-> font .-tables .-hhea .-ascender))
-                  hhea-descender  (abs (-> font .-tables .-hhea .-descender))
+                  hhea-ascender   (abs (-> ^js font .-tables .-hhea .-ascender))
+                  hhea-descender  (abs (-> ^js font .-tables .-hhea .-descender))
 
-                  win-ascent      (abs (-> font .-tables .-os2 .-usWinAscent))
-                  win-descent     (abs (-> font .-tables .-os2 .-usWinDescent))
+                  win-ascent      (abs (-> ^js font .-tables .-os2 .-usWinAscent))
+                  win-descent     (abs (-> ^js font .-tables .-os2 .-usWinDescent))
 
-                  os2-ascent      (abs (-> font .-tables .-os2 .-sTypoAscender))
-                  os2-descent     (abs (-> font .-tables .-os2 .-sTypoDescender))
+                  os2-ascent      (abs (-> ^js font .-tables .-os2 .-sTypoAscender))
+                  os2-descent     (abs (-> ^js font .-tables .-os2 .-sTypoDescender))
 
                   ;; useTypoMetrics can be read from the 7th bit
-                  f-selection     (-> (-> font .-tables .-os2 .-fsSelection)
-                                      (bit-test 7))
+                  f-selection     (-> ^js font .-tables .-os2 .-fsSelection (bit-test 7))
 
                   height-warning? (or (not= hhea-ascender win-ascent)
                                       (not= hhea-descender win-descent)
