@@ -85,6 +85,7 @@
                selected)
 
         index (:index (meta attrs))
+        [row column :as cell]  (:cell (meta attrs))
 
         changes (-> changes
                     (pcb/with-objects objects)
@@ -94,6 +95,8 @@
                       (pcb/add-object shape))
                     (cond-> (some? (:parent-id attrs))
                       (pcb/change-parent (:parent-id attrs) [shape]))
+                    (cond-> (some? cell)
+                      (pcb/update-shapes [(:parent-id shape)] #(ctl/push-into-cell % [id] row column)))
                     (cond-> (ctl/grid-layout? objects (:parent-id shape))
                       (pcb/update-shapes [(:parent-id shape)] ctl/assign-cells)))]
 

@@ -11,8 +11,10 @@
    [app.common.geom.point :as gpt]
    [app.common.pages.helpers :as cph]
    [app.common.types.shape-tree :as ctt]
+   [app.common.types.shape.layout :as ctl]
    [app.common.uuid :as uuid]
    [app.main.data.workspace :as dw]
+   [app.main.data.workspace.grid-layout.editor :as dwge]
    [app.main.data.workspace.interactions :as dwi]
    [app.main.refs :as refs]
    [app.main.store :as st]
@@ -23,6 +25,7 @@
    [app.main.ui.workspace.viewport.path-actions :refer [path-actions]]
    [app.main.ui.workspace.viewport.utils :as vwu]
    [app.util.dom :as dom]
+   [app.util.i18n :as i18n :refer [tr]]
    [app.util.timers :as ts]
    [debug :refer [debug?]]
    [rumext.v2 :as mf]))
@@ -55,16 +58,34 @@
         selected    (mf/deref refs/selected-objects)
         drawing     (mf/deref refs/workspace-drawing)
         drawing-obj (:object drawing)
-        shape       (or drawing-obj (-> selected first))]
-    (when (or (and (= (count selected) 1)
-                   (= (:id shape) edition)
-                   (and (not (cph/text-shape? shape))
-                        (not (cph/frame-shape? shape))))
-              (and (some? drawing-obj)
-                   (cph/path-shape? drawing-obj)
-                   (not= :curve (:tool drawing))))
+        shape       (or drawing-obj (-> selected first))
+
+        single? (= (count selected) 1)
+        editing? (= (:id shape) edition)
+        draw-path? (and (some? drawing-obj)
+                        (cph/path-shape? drawing-obj)
+                        (not= :curve (:tool drawing)))
+
+        path-edition? (or (and single? editing?
+                               (and (not (cph/text-shape? shape))
+                                    (not (cph/frame-shape? shape))))
+                          draw-path?)
+
+        grid-edition? (and single? editing? (ctl/grid-layout? shape))]
+
+    (cond
+      path-edition?
       [:div.viewport-actions
-       [:& path-actions {:shape shape}]])))
+       [:& path-actions {:shape shape}]]
+
+      grid-edition?
+      [:div.viewport-actions
+       [:div.grid-actions
+        [:div.grid-edit-title
+         (tr "workspace.layout_grid.editor.title")  " " [:span.grid-edit-board-name (:name shape)]]
+        [:button.btn-secondary {:on-click #(st/emit! (dwge/locate-board (:id shape)))} "Locate"]
+        [:button.btn-primary {:on-click #(st/emit! dw/clear-edition-mode)} "Done"]
+        [:button.btn-icon-basic {:on-click #(st/emit! dw/clear-edition-mode)} i/close]]])))
 
 (mf/defc cursor-tooltip
   [{:keys [zoom tooltip] :as props}]
@@ -96,7 +117,7 @@
 (mf/defc frame-title
   {::mf/wrap [mf/memo
               #(mf/deferred % ts/raf)]}
-  [{:keys [frame selected? zoom show-artboard-names? show-id? on-frame-enter on-frame-leave on-frame-select]}]
+  [{:keys [frame selected? zoom show-artboard-names? show-id? on-frame-enter on-frame-leave on-frame-select grid-edition?]}]
   (let [workspace-read-only? (mf/use-ctx ctx/workspace-read-only?)
         on-pointer-down
         (mf/use-callback
@@ -104,9 +125,9 @@
          (fn [bevent]
            (let [event  (.-nativeEvent bevent)]
              (when (= 1 (.-which event))
-               (dom/prevent-default event)
-               (dom/stop-propagation event)
-                 (on-frame-select event (:id frame))))))
+               (dom/prevent-default bevent)
+               (dom/stop-propagation bevent)
+               (on-frame-select event (:id frame))))))
 
         on-double-click
         (mf/use-callback
@@ -139,7 +160,7 @@
         text-pos-x (if (:use-for-thumbnail? frame) 15 0)]
 
     (when (not (:hidden frame))
-      [:g.frame-title {:id (dm/str "frame-title-" (:id frame)) :transform (vwu/title-transform frame zoom)}
+      [:g.frame-title {:id (dm/str "frame-title-" (:id frame)) :transform (vwu/title-transform frame zoom grid-edition?)}
        (when (:use-for-thumbnail? frame)
          [:svg {:x 0
                 :y -9
@@ -183,7 +204,10 @@
                                      (map (d/getf objects))
                                      selected)
                                shapes)
-        focus                (unchecked-get props "focus")]
+        focus                (unchecked-get props "focus")
+
+        edition              (mf/deref refs/selected-edition)
+        grid-edition?        (ctl/grid-layout? objects edition)]
 
     [:g.frame-titles
      (for [{:keys [id parent-id] :as shape} shapes]
@@ -199,7 +223,8 @@
                           :show-id? (debug? :shape-titles)
                           :on-frame-enter on-frame-enter
                           :on-frame-leave on-frame-leave
-                          :on-frame-select on-frame-select}]))]))
+                          :on-frame-select on-frame-select
+                          :grid-edition? (and (= id edition) grid-edition?)}]))]))
 
 (mf/defc frame-flow
   [{:keys [flow frame selected? zoom on-frame-enter on-frame-leave on-frame-select]}]

@@ -4714,3 +4714,6 @@ msgstr "Update"
 
 msgid "workspace.viewport.click-to-close-path"
 msgstr "Click to close the path"
+
+msgid "workspace.layout_grid.editor.title"
+msgstr "Editing grid"
