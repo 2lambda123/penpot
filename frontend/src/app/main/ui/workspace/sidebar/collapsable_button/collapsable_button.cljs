@@ -18,6 +18,7 @@
 (mf/defc collapsed-button
   {::mf/wrap-props false}
   []
+  (prn "collapsed-button")
   (let [new-css-system (mf/use-ctx ctx/new-css-system)]
     (if new-css-system
       [:div {:class (dom/classnames (css :collapsed-sidebar) true)}

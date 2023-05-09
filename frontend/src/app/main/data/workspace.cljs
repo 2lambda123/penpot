@@ -181,13 +181,14 @@
                 (rx/of (dwn/initialize team-id id)
                        (dwsl/initialize))
 
-                ;; Load team fonts. We must ensure custom fonts are fully loadad before starting the workspace load
+                ;; Load team fonts. We must ensure custom fonts are fully loadad
+                ;; before starting the workspace load.
                 (rx/merge
+                 (rx/of (df/load-team-fonts team-id))
                  (->> stream
                       (rx/filter (ptk/type? :app.main.data.fonts/team-fonts-loaded))
                       (rx/take 1)
-                      (rx/ignore))
-                 (rx/of (df/load-team-fonts team-id)))
+                      (rx/ignore)))
 
                 (rx/merge
                  ;; Load all pages, independently if they are pointers or already
@@ -218,8 +219,7 @@
                       (rx/merge-map
                        (fn [_]
                          (rx/merge
-                          (rx/of (workspace-initialized))
-
+                          ;; (rx/of (workspace-initialized))
                           (->> data
                                (filter (comp t/pointer? val))
                                (resolve-pointers id)
@@ -246,8 +246,9 @@
                                         (fn [pages-index]
                                           (assoc-in file [:data :pages-index] pages-index))))))
                                (rx/reduce conj [])
-                               (rx/map libraries-fetched))))))))
+                               (rx/map libraries-fetched)))))))
 
+                (rx/of (workspace-initialized)))
                (rx/take-until stoper)))))))
 
 (defn- libraries-fetched

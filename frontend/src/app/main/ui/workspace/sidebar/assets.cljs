@@ -8,6 +8,7 @@
   (:require
    [app.common.data :as d]
    [app.common.data.macros :as dm]
+   [app.util.perf :as perf]
    [app.common.media :as cm]
    [app.common.pages.helpers :as cph]
    [app.common.spec :as us]
@@ -553,6 +554,7 @@
         (for [[path-item content] groups]
           (when-not (empty? path-item)
             [:& components-group {:file file
+                                  :key path-item
                                   :prefix (cph/merge-path-item prefix path-item)
                                   :groups content
                                   :open-groups open-groups
@@ -1777,7 +1779,7 @@
            (st/emit! (dwl/add-typography typography)
              (ptk/event ::ev/event {::ev/name "add-asset-to-library"
                                     :asset-type "typography"}))))
-        
+
         handle-change
         (mf/use-fn
          (mf/deps file-id)
@@ -1954,6 +1956,18 @@
 
 ;; --- Assets toolbox ----
 
+(def ref:file-library-listing-thumbs?
+  (l/derived :file-library-listing-thumbs refs/workspace-global))
+
+(def ref:file-library-reverse-sort?
+  (l/derived :file-library-reverse-sort refs/workspace-global))
+
+(def ref:selected-assets
+  (l/derived :selected-assets refs/workspace-global))
+
+(def ref:open-status
+  (l/atom {}))
+
 (defn file-colors-ref
   [id]
   (l/derived (fn [state]
@@ -1978,7 +1992,7 @@
                (let [wfile (:workspace-data state)]
                  (if (= (:id wfile) id)
                    (ctkl/components-seq wfile)
-                   (ctkl/components-seq (get-in state [:workspace-libraries id :data])))))
+                   (ctkl/components-seq (dm/get-in state [:workspace-libraries id :data])))))
              st/state =))
 
 (defn file-typography-ref
@@ -1987,14 +2001,8 @@
                (let [wfile (:workspace-data state)]
                  (if (= (:id wfile) id)
                    (vals (get wfile :typographies))
-                   (vals (get-in state [:workspace-libraries id :data :typographies])))))
+                   (vals (dm/get-in state [:workspace-libraries id :data :typographies])))))
              st/state =))
-
-(defn make-open-file-ref
-  [id]
-  (mf/with-memo [id]
-    (-> (l/in [:assets-files-open id])
-        (l/derived refs/workspace-global))))
 
 (defn apply-filters
   [coll filters reverse-sort?]
@@ -2013,29 +2021,39 @@
 
 (mf/defc file-library
   [{:keys [file local? default-open? filters] :as props}]
-  (let [open-file            (mf/deref (make-open-file-ref (:id file)))
-        open?                (-> open-file
-                                 :library
-                                 (d/nilv default-open?))
-        open-box?            (fn [box]
-                               (-> open-file
-                                   box
-                                   (d/nilv true)))
-        open-groups          (fn [box]
-                               (-> open-file
-                                   :groups
-                                   box
-                                   (d/nilv {})))
+  (let [file-id              (:id file)
+        file-name            (:name file)
         shared?              (:is-shared file)
+        project-id           (:project-id file)
+
+        open-file-ref        (mf/with-memo [file-id]
+                               (-> (l/in [:assets-files-open file-id])
+                                   (l/derived refs/workspace-global)))
+
+        open-file            (mf/deref open-file-ref)
+
+        open?                (-> (:library open-file)
+                                 (d/nilv default-open?))
+
+        open-box?            (fn [box]
+                               (-> (get open-file box)
+                                   (d/nilv true)))
+
+        open-groups          (fn [box]
+                               (-> (:groups open-file)
+                                   (get box)
+                                   (d/nilv {})))
+
         router               (mf/deref refs/router)
 
-        reverse-sort?      (mf/deref refs/file-library-reverse-sort?)
-        reverse-sort?      (if (nil? reverse-sort?) false reverse-sort?)
 
-        listing-thumbs?      (mf/deref refs/file-library-listing-thumbs?)
+        reverse-sort?        (mf/deref ref:file-library-reverse-sort?)
+        reverse-sort?        (if (nil? reverse-sort?) false reverse-sort?)
+
+        listing-thumbs?      (mf/deref ref:file-library-listing-thumbs?)
         listing-thumbs?      (if (nil? listing-thumbs?) true listing-thumbs?)
 
-        selected-assets      (mf/deref refs/selected-assets)
+        selected-assets      (mf/deref ref:selected-assets)
 
         selected-count       (+ (count (:components selected-assets))
                                 (count (:graphics selected-assets))
@@ -2044,23 +2062,28 @@
 
         components-v2        (mf/use-ctx ctx/components-v2)
 
-        toggle-open          #(st/emit! (dwl/set-assets-box-open (:id file) :library (not open?)))
+        toggle-open          (mf/use-fn
+                              (mf/deps file-id open?)
+                              (fn []
+                                (st/emit! (dwl/set-assets-box-open file-id :library (not open?)))))
 
-        url                  (rt/resolve router :workspace
-                                         {:project-id (:project-id file)
-                                          :file-id (:id file)}
-                                         {:page-id (get-in file [:data :pages 0])})
+        url                  (mf/with-memo [router file]
+                               (let [page-id (dm/get-in file [:data :pages 0])]
+                                 (rt/resolve router :workspace
+                                             {:project-id project-id
+                                              :file-id file-id}
+                                             {:page-id page-id})))
 
-        colors-ref           (mf/use-memo (mf/deps (:id file)) #(file-colors-ref (:id file)))
+        colors-ref           (mf/use-memo (mf/deps file-id) #(file-colors-ref file-id))
         colors               (apply-filters (mf/deref colors-ref) filters reverse-sort?)
 
-        typography-ref       (mf/use-memo (mf/deps (:id file)) #(file-typography-ref (:id file)))
+        typography-ref       (mf/use-memo (mf/deps file-id) #(file-typography-ref file-id))
         typographies         (apply-filters (mf/deref typography-ref) filters reverse-sort?)
 
-        media-ref            (mf/use-memo (mf/deps (:id file)) #(file-media-ref (:id file)))
+        media-ref            (mf/use-memo (mf/deps file-id) #(file-media-ref file-id))
         media                (apply-filters (mf/deref media-ref) filters reverse-sort?)
 
-        components-ref       (mf/use-memo (mf/deps (:id file)) #(file-components-ref (:id file)))
+        components-ref       (mf/use-memo (mf/deps file-id) #(file-components-ref file-id))
         components           (apply-filters (mf/deref components-ref) filters reverse-sort?)
 
         toggle-sort
@@ -2136,40 +2159,42 @@
          (fn []
            (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
-             (apply st/emit! (map #(dwl/delete-component {:id %})
-                                  (:components selected-assets)))
-             (apply st/emit! (map #(dwl/delete-media {:id %})
-                                  (:graphics selected-assets)))
-             (apply st/emit! (map #(dwl/delete-color {:id %})
-                                  (:colors selected-assets)))
-             (apply st/emit! (map #(dwl/delete-typography %)
-                                  (:typographies selected-assets)))
+             (run! st/emit! (map #(dwl/delete-component {:id %})
+                                 (:components selected-assets)))
+             (run! st/emit! (map #(dwl/delete-media {:id %})
+                                 (:graphics selected-assets)))
+             (run! st/emit! (map #(dwl/delete-color {:id %})
+                                 (:colors selected-assets)))
+             (run! st/emit! (map #(dwl/delete-typography %)
+                                 (:typographies selected-assets)))
              (when (or (d/not-empty? (:components selected-assets))
                        (d/not-empty? (:colors selected-assets))
                        (d/not-empty? (:typographies selected-assets)))
                (st/emit! (dwl/sync-file (:id file) (:id file))))
              (st/emit! (dwu/commit-undo-transaction undo-id)))))]
 
-    [:div.tool-window {:on-context-menu #(dom/prevent-default %)
-                       :on-click unselect-all}
-     [:div.tool-window-bar.library-bar
-      {:on-click toggle-open}
-      [:div.collapse-library
-       {:class (dom/classnames :open open?)}
-       i/arrow-slide]
 
-      (if local?
-        [:*
-         [:span (:name file) " (" (tr "workspace.assets.local-library") ")"]
-         (when shared?
-           [:span.tool-badge (tr "workspace.assets.shared")])]
-        [:*
-         [:span (:name file)]
-         [:span.tool-link.tooltip.tooltip-left {:alt "Open library file"}
-          [:a {:href (str "#" url)
-               :target "_blank"
-               :on-click dom/stop-propagation}
-           i/chain]]])]
+    [:& perf/profiler {:enabled false :label "sidebar/file-library"}
+     [:div.tool-window {:on-context-menu dom/prevent-default
+                        :on-click unselect-all}
+      [:div.tool-window-bar.library-bar
+       {:on-click toggle-open}
+       [:div.collapse-library
+        {:class (dom/classnames :open open?)}
+        i/arrow-slide]
+
+       (if local?
+         [:*
+          [:span (:name file) " (" (tr "workspace.assets.local-library") ")"]
+          (when shared?
+            [:span.tool-badge (tr "workspace.assets.shared")])]
+         [:*
+          [:span (:name file)]
+          [:span.tool-link.tooltip.tooltip-left {:alt "Open library file"}
+           [:a {:href (str "#" url)
+                :target "_blank"
+                :on-click dom/stop-propagation}
+            i/chain]]])]
 
      (when open?
        (let [show-components?   (and (or (= (:box filters) :all)
@@ -2256,35 +2281,56 @@
 
           (when (and (not show-components?) (not show-graphics?) (not show-colors?) (not show-typography?))
             [:div.asset-section
-             [:div.asset-title (tr "workspace.assets.not-found")]])]))]))
+             [:div.asset-title (tr "workspace.assets.not-found")]])]))]]))
 
+(mf/defc assets-libraries
+  {::mf/wrap [mf/memo]}
+  [{:keys [filters]}]
+  (let [libraries (mf/deref refs/workspace-libraries)
+        libraries (mf/with-memo [libraries]
+                    (->> (vals libraries)
+                         (remove :is-indirect)
+                         (sort-by #(str/lower (:name %)))))]
+    [:*
+     (for [file libraries]
+       [:& file-library
+        {:key (dm/str (:id file))
+         :file file
+         :local? false
+         :default-open? false
+         :filters filters}])]))
+
+(mf/defc assets-local-library
+  {::mf/wrap [mf/memo]}
+  [{:keys [filters]}]
+  ;; FIXME: revisit, we dont need to change on each file change
+  (let [file (mf/deref refs/workspace-file)]
+    [:& file-library
+     {:file file
+      :local? true
+      :default-open? true
+      :filters filters}]))
 
 (mf/defc assets-toolbox
+  {::mf/wrap [mf/memo]}
   []
-  (let [libraries            (->> (mf/deref refs/workspace-libraries)
-                                  (vals)
-                                  (remove :is-indirect))
-        file                 (mf/deref refs/workspace-file)
-        team-id              (mf/use-ctx ctx/current-team-id)
+  (prn "assets-toolbox")
+  (let [workspace-read-only? (mf/use-ctx ctx/workspace-read-only?)
         filters              (mf/use-state {:term "" :box :all})
-        workspace-read-only? (mf/use-ctx ctx/workspace-read-only?)
 
         on-search-term-change
         (mf/use-fn
-         (mf/deps team-id)
          (fn [event]
            (let [value (dom/get-target-val event)]
              (swap! filters assoc :term value))))
 
         on-search-clear-click
         (mf/use-fn
-         (mf/deps team-id)
          (fn [_]
            (swap! filters assoc :term "")))
 
         on-box-filter-change
         (mf/use-fn
-         (mf/deps team-id)
          (fn [event]
            (let [value (-> (dom/get-target event)
                            (dom/get-value)
@@ -2296,58 +2342,44 @@
          (fn [event]
            (let [enter? (kbd/enter? event)
                  esc?   (kbd/esc? event)
-                 input-node (dom/event->target event)]
+                 node   (dom/event->target event)]
 
-             (when enter?
-               (dom/blur! input-node))
-             (when esc?
-               (dom/blur! input-node)))))]
+             (when enter? (dom/blur! node))
+             (when esc?   (dom/blur! node)))))]
 
-    [:div.assets-bar
-     [:div.tool-window
-      [:div.tool-window-content
-       [:div.assets-bar-title
-        (tr "workspace.assets.assets")
-        (when-not workspace-read-only?
-          [:div.libraries-button {:on-click #(modal/show! :libraries-dialog {})}
-           i/text-align-justify
-           (tr "workspace.assets.libraries")])]
+    [:& perf/profiler {:enabled false :label "sidebar/assets"}
+     [:div.assets-bar
+      [:div.tool-window
+       [:div.tool-window-content
+        [:div.assets-bar-title
+         (tr "workspace.assets.assets")
+         (when-not workspace-read-only?
+           [:div.libraries-button {:on-click #(modal/show! :libraries-dialog {})}
+            i/text-align-justify
+            (tr "workspace.assets.libraries")])]
 
-       [:div.search-block
-        [:input.search-input
-         {:placeholder (tr "workspace.assets.search")
-          :type "text"
-          :value (:term @filters)
-          :on-change on-search-term-change
-          :on-key-down handle-key-down}]
-        (if (str/empty? (:term @filters))
-          [:div.search-icon
-           i/search]
-          [:div.search-icon.close
-           {:on-click on-search-clear-click}
-           i/close])]
+        [:div.search-block
+         [:input.search-input
+          {:placeholder (tr "workspace.assets.search")
+           :type "text"
+           :value (:term @filters)
+           :on-change on-search-term-change
+           :on-key-down handle-key-down}]
+         (if (str/empty? (:term @filters))
+           [:div.search-icon
+            i/search]
+           [:div.search-icon.close
+            {:on-click on-search-clear-click}
+            i/close])]
 
-       [:select.input-select {:value (:box @filters)
-                              :on-change on-box-filter-change}
-        [:option {:value ":all"} (tr "workspace.assets.box-filter-all")]
-        [:option {:value ":components"} (tr "workspace.assets.components")]
-        [:option {:value ":graphics"} (tr "workspace.assets.graphics")]
-        [:option {:value ":colors"} (tr "workspace.assets.colors")]
-        [:option {:value ":typographies"} (tr "workspace.assets.typography")]]]]
+        [:select.input-select {:value (:box @filters)
+                               :on-change on-box-filter-change}
+         [:option {:value ":all"} (tr "workspace.assets.box-filter-all")]
+         [:option {:value ":components"} (tr "workspace.assets.components")]
+         [:option {:value ":graphics"} (tr "workspace.assets.graphics")]
+         [:option {:value ":colors"} (tr "workspace.assets.colors")]
+         [:option {:value ":typographies"} (tr "workspace.assets.typography")]]]]
 
-     [:div.libraries-wrapper
-      [:& file-library
-       {:file file
-        :local? true
-        :default-open? true
-        :filters @filters}]
-
-      (for [file (->> libraries
-                      (sort-by #(str/lower (:name %))))]
-        [:& file-library
-         {:key (:id file)
-          :file file
-          :local? false
-          :default-open? false
-          :filters @filters}])]]))
-
+      [:div.libraries-wrapper
+       [:& assets-local-library {:filters @filters}]
+       [:& assets-libraries {:filters @filters}]]]]))
