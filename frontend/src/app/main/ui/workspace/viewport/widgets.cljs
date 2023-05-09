@@ -157,11 +157,12 @@
          (mf/deps (:id frame) on-frame-leave)
          (fn [_]
            (on-frame-leave (:id frame))))
-        text-pos-x (if (:use-for-thumbnail? frame) 15 0)]
+        text-pos-x (if (or (:use-for-thumbnail? frame) grid-edition?) 15 0)]
 
     (when (not (:hidden frame))
       [:g.frame-title {:id (dm/str "frame-title-" (:id frame)) :transform (vwu/title-transform frame zoom grid-edition?)}
-       (when (:use-for-thumbnail? frame)
+       (cond
+         (or (:use-for-thumbnail? frame) grid-edition?)
          [:svg {:x 0
                 :y -9
                 :width 12
@@ -169,7 +170,13 @@
                 :class "workspace-frame-icon"
                 :style {:fill (when selected? "var(--color-primary-dark)")}
                 :visibility (if show-artboard-names? "visible" "hidden")}
-          [:use {:href "#icon-set-thumbnail"}]])
+          (cond
+            (:use-for-thumbnail? frame)
+            [:use {:href "#icon-set-thumbnail"}]
+
+            grid-edition?
+            [:use {:href "#icon-grid-layout-mode"}])])
+
        [:text {:x text-pos-x
                :y 0
                :width (:width frame)
