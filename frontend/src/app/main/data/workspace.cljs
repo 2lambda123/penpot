@@ -1102,31 +1102,31 @@
   (ptk/reify ::toggle-selected-assets
     ptk/UpdateEvent
     (update [_ state]
-      (update-in state [:workspace-global :selected-assets type] #(check-in-asset % asset)))))
+      (update-in state [:workspace-assets-selected type] #(check-in-asset % asset)))))
 
 (defn select-single-asset
   [asset type]
   (ptk/reify ::select-single-asset
     ptk/UpdateEvent
     (update [_ state]
-      (assoc-in state [:workspace-global :selected-assets type] #{asset}))))
+      (assoc-in state [:workspace-assets-selected type] #{asset}))))
 
 (defn select-assets
   [assets type]
   (ptk/reify ::select-assets
     ptk/UpdateEvent
     (update [_ state]
-      (assoc-in state [:workspace-global :selected-assets type] (into #{} assets)))))
+      (assoc-in state [:workspace-assets-selected type] (into #{} assets)))))
 
 (defn unselect-all-assets
   []
   (ptk/reify ::unselect-all-assets
     ptk/UpdateEvent
     (update [_ state]
-      (assoc-in state [:workspace-global :selected-assets] {:components #{}
-                                                            :graphics #{}
-                                                            :colors #{}
-                                                            :typographies #{}}))))
+      (assoc state :workspace-assets-selected {:components #{}
+                                               :graphics #{}
+                                               :colors #{}
+                                               :typographies #{}}))))
 (defn go-to-main-instance
   [page-id shape-id]
   (dm/assert! (uuid? page-id))
@@ -2051,19 +2051,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defn set-file-library-listing-thumbs
-  [listing-thumbs?]
-  (ptk/reify ::set-file-library-listing-thumbs
-    ptk/UpdateEvent
-    (update [_ state]
-      (assoc-in state [:workspace-global :file-library-listing-thumbs] listing-thumbs?))))
+;; (defn set-file-library-listing-thumbs
+;;   [listing-thumbs?]
+;;   (ptk/reify ::set-file-library-listing-thumbs
+;;     ptk/UpdateEvent
+;;     (update [_ state]
+;;       (assoc-in state [:workspace-global :file-library-listing-thumbs] listing-thumbs?))))
 
-(defn set-file-library-reverse-sort
-  [reverse-sort?]
-  (ptk/reify ::set-file-library-reverse-sort
-    ptk/UpdateEvent
-    (update [_ state]
-      (assoc-in state [:workspace-global :file-library-reverse-sort] reverse-sort?))))
+;; (defn set-file-library-reverse-sort
+;;   [reverse-sort?]
+;;   (ptk/reify ::set-file-library-reverse-sort
+;;     ptk/UpdateEvent
+;;     (update [_ state]
+;;       (assoc-in state [:workspace-global :file-library-reverse-sort] reverse-sort?))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Exports

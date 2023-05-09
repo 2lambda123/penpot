@@ -80,14 +80,14 @@
   (ptk/reify ::set-assets-box-open
     ptk/UpdateEvent
     (update [_ state]
-      (assoc-in state [:workspace-global :assets-files-open file-id box] open?))))
+      (assoc-in state [:workspace-assets-open-status file-id box] open?))))
 
 (defn set-assets-group-open
   [file-id box path open?]
   (ptk/reify ::set-assets-group-open
     ptk/UpdateEvent
     (update [_ state]
-      (assoc-in state [:workspace-global :assets-files-open file-id :groups box path] open?))))
+      (assoc-in state [:workspace-assets-open-status file-id :groups box path] open?))))
 
 (defn extract-path-if-missing
   [item]

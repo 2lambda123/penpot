@@ -557,6 +557,7 @@
           [:span.label (tr "workspace.assets.typography.text-transform")]
           [:span (:text-transform typography)]]
 
+         ;; FIXME: this is the unique reason why we receive a complete file here, looks not reasonable tradeoff
          (when-not local?
            [:div.row-flex
             [:a.go-to-lib-button

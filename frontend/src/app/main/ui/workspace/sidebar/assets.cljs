@@ -138,7 +138,7 @@
 
         create? (empty? path)
 
-        on-close #(modal/hide!)
+        on-close (mf/use-fn #(modal/hide!))
 
         on-accept
         (mf/use-fn
@@ -378,6 +378,8 @@
 
         components-v2        (mf/use-ctx ctx/components-v2)
 
+        ;; FIXME: this is the reason why cant delete :page-index from file
+        ;; We need to think in an alternative
         file                 (or (:data file) file)
         root-shape           (ctf/get-component-root file component)
         component-container  (if components-v2
@@ -473,7 +475,7 @@
              [:div.dragging])])])]))
 
 (mf/defc components-group
-  [{:keys [file prefix groups open-groups renaming listing-thumbs? selected-components on-asset-click
+  [{:keys [file file-id prefix groups open-groups renaming listing-thumbs? selected-components on-asset-click
            on-drag-start do-rename cancel-rename on-rename-group on-group on-ungroup on-context-menu
            selected-components-full]}]
   (let [group-open? (get open-groups prefix true)
@@ -508,7 +510,7 @@
            :on-drag-leave on-drag-leave
            :on-drag-over on-drag-over
            :on-drop on-drop}
-     [:& asset-group-title {:file-id (:id file)
+     [:& asset-group-title {:file-id file-id
                             :box :components
                             :path prefix
                             :group-open? group-open?
@@ -554,6 +556,7 @@
         (for [[path-item content] groups]
           (when-not (empty? path-item)
             [:& components-group {:file file
+                                  :file-id file-id
                                   :key path-item
                                   :prefix (cph/merge-path-item prefix path-item)
                                   :groups content
@@ -571,7 +574,7 @@
                                   :selected-components-full selected-components-full}]))])]))
 
 (mf/defc components-box
-  [{:keys [file local? components listing-thumbs? open? reverse-sort? open-groups selected-assets
+  [{:keys [file file-id local? components listing-thumbs? open? reverse-sort? open-groups selected-assets
            on-asset-click on-assets-delete on-clear-selection] :as props}]
   (let [input-ref                (mf/use-ref nil)
         state                    (mf/use-state {:renaming nil
@@ -594,14 +597,14 @@
         add-component
         (mf/use-fn
          (fn []
-           #(st/emit! (dwl/set-assets-box-open (:id file) :components true))
+           (st/emit! (dwl/set-assets-box-open file-id :components true))
            (dom/click (mf/ref-val input-ref))))
 
         on-file-selected
         (mf/use-fn
-         (mf/deps file)
+         (mf/deps file-id)
          (fn [blobs]
-           (let [params {:file-id (:id file)
+           (let [params {:file-id file-id
                          :blobs (seq blobs)}]
              (st/emit! (dwm/upload-media-components params)
                        (ptk/event ::ev/event {::ev/name "add-asset-to-library"
@@ -613,10 +616,10 @@
          (fn []
            (let [undo-id (js/Symbol)]
              (if (empty? selected-components)
-               (st/emit! (dwl/duplicate-component (:id file) (:component-id @state)))
+               (st/emit! (dwl/duplicate-component file-id (:component-id @state)))
                (do
                  (st/emit! (dwu/start-undo-transaction undo-id))
-                 (apply st/emit! (map (partial dwl/duplicate-component (:id file)) selected-components))
+                 (apply st/emit! (map (partial dwl/duplicate-component file-id) selected-components))
                  (st/emit! (dwu/commit-undo-transaction undo-id)))))))
 
         on-delete
@@ -628,7 +631,7 @@
              (on-assets-delete)
              (st/emit! (dwu/start-undo-transaction undo-id)
                        (dwl/delete-component {:id (:component-id @state)})
-                       (dwl/sync-file (:id file) (:id file) :components (:component-id @state))
+                       (dwl/sync-file file-id file-id :components (:component-id @state))
                        (dwu/commit-undo-transaction undo-id))))))
 
         on-rename
@@ -731,7 +734,7 @@
         on-drag-start
         (mf/use-fn
          (fn [component event]
-           (dnd/set-data! event "penpot/component" {:file-id (:id file)
+           (dnd/set-data! event "penpot/component" {:file-id file-id
                                                     :component component})
            (dnd/set-allowed-effect! event "move")))
 
@@ -749,7 +752,7 @@
              (when (and main-instance-id main-instance-page) ;; Only when :components-v2 is enabled
                (st/emit! (dw/go-to-main-instance main-instance-page main-instance-id))))))]
 
-    [:& asset-section {:file-id (:id file)
+    [:& asset-section {:file-id file-id
                        :title (tr "workspace.assets.components")
                        :box :components
                        :assets-count (count components)
@@ -766,6 +769,7 @@
 
      [:& asset-section-block {:role :content}
       [:& components-group {:file file
+                            :file-id file-id
                             :prefix ""
                             :groups groups
                             :open-groups open-groups
@@ -1956,17 +1960,11 @@
 
 ;; --- Assets toolbox ----
 
-(def ref:file-library-listing-thumbs?
-  (l/derived :file-library-listing-thumbs refs/workspace-global))
-
-(def ref:file-library-reverse-sort?
-  (l/derived :file-library-reverse-sort refs/workspace-global))
-
 (def ref:selected-assets
-  (l/derived :selected-assets refs/workspace-global))
+  (l/derived :workspace-assets-selected st/state))
 
 (def ref:open-status
-  (l/atom {}))
+  (l/derived :workspace-assets-open-status st/state))
 
 (defn file-colors-ref
   [id]
@@ -2019,84 +2017,139 @@
                                                    (:name %)))
                   comp-fn))))
 
-(mf/defc file-library
-  [{:keys [file local? default-open? filters] :as props}]
-  (let [file-id              (:id file)
-        file-name            (:name file)
-        shared?              (:is-shared file)
-        project-id           (:project-id file)
 
-        open-file-ref        (mf/with-memo [file-id]
-                               (-> (l/in [:assets-files-open file-id])
-                                   (l/derived refs/workspace-global)))
+(mf/defc file-library-title
+  {::mf/wrap-props false}
+  [props]
+  (let [open?      (unchecked-get props "open?")
+        local?     (unchecked-get props "local?")
+        shared?    (unchecked-get props "shared?")
+        project-id (unchecked-get props "project-id")
+        file-id    (unchecked-get props "file-id")
+        page-id    (unchecked-get props "page-id")
+        file-name  (unchecked-get props "file-name")
 
-        open-file            (mf/deref open-file-ref)
+        router     (mf/deref refs/router)
+        url        (rt/resolve router :workspace
+                               {:project-id project-id
+                                :file-id file-id}
+                               {:page-id page-id})
 
-        open?                (-> (:library open-file)
-                                 (d/nilv default-open?))
+        toggle-open
+        (mf/use-fn
+         (mf/deps file-id open?)
+         (fn []
+           (prn "toggle-open" file-id open?)
+           (st/emit! (dwl/set-assets-box-open file-id :library (not open?)))))
+        ]
 
-        open-box?            (fn [box]
-                               (-> (get open-file box)
-                                   (d/nilv true)))
+    [:div.tool-window-bar.library-bar
+     {:on-click toggle-open}
+     [:div.collapse-library
+      {:class (dom/classnames :open open?)}
+      i/arrow-slide]
 
-        open-groups          (fn [box]
-                               (-> (:groups open-file)
-                                   (get box)
-                                   (d/nilv {})))
+     (if local?
+       [:*
+        [:span file-name " (" (tr "workspace.assets.local-library") ")"]
+        (when shared?
+          [:span.tool-badge (tr "workspace.assets.shared")])]
+       [:*
+        [:span file-name]
+        [:span.tool-link.tooltip.tooltip-left {:alt "Open library file"}
+         [:a {:href (str "#" url)
+              :target "_blank"
+              :on-click dom/stop-propagation}
+          i/chain]]])]))
 
-        router               (mf/deref refs/router)
+(mf/defc file-library-content
+  {::mf/wrap-props false
+   ::mf/wrap [mf/memo]}
+  [props]
+  (let [filters            (unchecked-get props "filters")
+        file               (unchecked-get props "file")
+        local?             (unchecked-get props "local?")
 
+        open-status-ref    (unchecked-get props "open-status-ref")
+        on-clear-selection (unchecked-get props "on-clear-selection")
 
-        reverse-sort?        (mf/deref ref:file-library-reverse-sort?)
-        reverse-sort?        (if (nil? reverse-sort?) false reverse-sort?)
+        components-v2      (mf/use-ctx ctx/components-v2)
 
-        listing-thumbs?      (mf/deref ref:file-library-listing-thumbs?)
-        listing-thumbs?      (if (nil? listing-thumbs?) true listing-thumbs?)
+        open-status        (mf/deref open-status-ref)
+        open-box?          (mf/use-fn
+                             (mf/deps open-status)
+                             (fn [box]
+                               (d/nilv (get open-status box) true)))
 
-        selected-assets      (mf/deref ref:selected-assets)
+        open-groups        (mf/use-fn
+                            (mf/deps open-status)
+                            (fn [box]
+                              (-> (dm/get-in open-status [:groups box])
+                                  (d/nilv {}))))
 
-        selected-count       (+ (count (:components selected-assets))
-                                (count (:graphics selected-assets))
-                                (count (:colors selected-assets))
-                                (count (:typographies selected-assets)))
+        file-id            (:id file)
+        project-id         (:project-id file)
+        filters-box        (:box filters)
+        filters-term       (:term filters)
 
-        components-v2        (mf/use-ctx ctx/components-v2)
-
-        toggle-open          (mf/use-fn
-                              (mf/deps file-id open?)
-                              (fn []
-                                (st/emit! (dwl/set-assets-box-open file-id :library (not open?)))))
-
-        url                  (mf/with-memo [router file]
-                               (let [page-id (dm/get-in file [:data :pages 0])]
-                                 (rt/resolve router :workspace
-                                             {:project-id project-id
-                                              :file-id file-id}
-                                             {:page-id page-id})))
-
-        colors-ref           (mf/use-memo (mf/deps file-id) #(file-colors-ref file-id))
-        colors               (apply-filters (mf/deref colors-ref) filters reverse-sort?)
-
-        typography-ref       (mf/use-memo (mf/deps file-id) #(file-typography-ref file-id))
-        typographies         (apply-filters (mf/deref typography-ref) filters reverse-sort?)
-
-        media-ref            (mf/use-memo (mf/deps file-id) #(file-media-ref file-id))
-        media                (apply-filters (mf/deref media-ref) filters reverse-sort?)
-
-        components-ref       (mf/use-memo (mf/deps file-id) #(file-components-ref file-id))
-        components           (apply-filters (mf/deref components-ref) filters reverse-sort?)
+        local              (h/use-shared-state ::assets {})
+        reverse-sort?      (d/nilv (:reverse-sort @local) false)
+        listing-thumbs?    (d/nilv (:listing-thumbs @local) true)
 
         toggle-sort
         (mf/use-fn
          (mf/deps reverse-sort?)
          (fn [_]
-           (st/emit! (dw/set-file-library-reverse-sort (not reverse-sort?)))))
+           (swap! local assoc :reverse-sort (not reverse-sort?))))
 
         toggle-listing
         (mf/use-fn
          (mf/deps listing-thumbs?)
          (fn [_]
-           (st/emit! (dw/set-file-library-listing-thumbs (not listing-thumbs?)))))
+           (swap! local assoc :listing-thumbs (not listing-thumbs?))))
+
+        colors-ref         (mf/use-memo (mf/deps file-id) #(file-colors-ref file-id))
+        components-ref     (mf/use-memo (mf/deps file-id) #(file-components-ref file-id))
+        media-ref          (mf/use-memo (mf/deps file-id) #(file-media-ref file-id))
+        typography-ref     (mf/use-memo (mf/deps file-id) #(file-typography-ref file-id))
+
+        colors             (mf/deref colors-ref)
+        components         (mf/deref components-ref)
+        media              (mf/deref media-ref)
+        typographies       (mf/deref typography-ref)
+
+        colors             (mf/with-memo [filters colors]
+                             (apply-filters colors filters reverse-sort?))
+        components         (mf/with-memo [filters components]
+                             (apply-filters components filters reverse-sort?))
+        media              (mf/with-memo [filters media]
+                             (apply-filters media filters reverse-sort?))
+        typographies       (mf/with-memo [filters typographies]
+                             (apply-filters typographies filters reverse-sort?))
+
+        show-components?   (and (or (= filters-box :all)
+                                    (= filters-box :components))
+                                (or (pos? (count components))
+                                    (str/empty? filters-term)))
+        show-graphics?     (and (or (= filters-box :all)
+                                    (= filters-box :graphics))
+                                (or (pos? (count media))
+                                    (and (str/empty? filters-term)
+                                         (not components-v2))))
+        show-colors?       (and (or (= filters-box :all)
+                                    (= filters-box :colors))
+                                (or (> (count colors) 0)
+                                         (str/empty? filters-term)))
+        show-typography?   (and (or (= filters-box :all)
+                                    (= filters-box :typographies))
+                                (or (pos? (count typographies))
+                                    (str/empty? filters-term)))
+
+        selected-assets    (mf/deref ref:selected-assets)
+        selected-count     (+ (count (:components selected-assets))
+                              (count (:graphics selected-assets))
+                              (count (:colors selected-assets))
+                              (count (:typographies selected-assets)))
 
         extend-selected-assets
         (mf/use-fn
@@ -2128,11 +2181,6 @@
                                    set)]
 
                    (st/emit! (dw/select-assets values asset-type))))))))
-
-        unselect-all
-        (mf/use-fn
-         (fn []
-           (st/emit! (dw/unselect-all-assets))))
 
         on-asset-click
         (mf/use-fn
@@ -2173,47 +2221,6 @@
                (st/emit! (dwl/sync-file (:id file) (:id file))))
              (st/emit! (dwu/commit-undo-transaction undo-id)))))]
 
-
-    [:& perf/profiler {:enabled false :label "sidebar/file-library"}
-     [:div.tool-window {:on-context-menu dom/prevent-default
-                        :on-click unselect-all}
-      [:div.tool-window-bar.library-bar
-       {:on-click toggle-open}
-       [:div.collapse-library
-        {:class (dom/classnames :open open?)}
-        i/arrow-slide]
-
-       (if local?
-         [:*
-          [:span (:name file) " (" (tr "workspace.assets.local-library") ")"]
-          (when shared?
-            [:span.tool-badge (tr "workspace.assets.shared")])]
-         [:*
-          [:span (:name file)]
-          [:span.tool-link.tooltip.tooltip-left {:alt "Open library file"}
-           [:a {:href (str "#" url)
-                :target "_blank"
-                :on-click dom/stop-propagation}
-            i/chain]]])]
-
-     (when open?
-       (let [show-components?   (and (or (= (:box filters) :all)
-                                         (= (:box filters) :components))
-                                     (or (> (count components) 0)
-                                         (str/empty? (:term filters))))
-             show-graphics?     (and (or (= (:box filters) :all)
-                                         (= (:box filters) :graphics))
-                                     (or (> (count media) 0)
-                                         (and (str/empty? (:term filters))
-                                              (not components-v2))))
-             show-colors?       (and (or (= (:box filters) :all)
-                                         (= (:box filters) :colors))
-                                     (or (> (count colors) 0)
-                                         (str/empty? (:term filters))))
-             show-typography?   (and (or (= (:box filters) :all)
-                                         (= (:box filters) :typographies))
-                                     (or (> (count typographies) 0)
-                                         (str/empty? (:term filters))))]
          [:div.tool-window-content
           [:div.listing-options
            (when (> selected-count 0)
@@ -2229,59 +2236,112 @@
               i/listing-thumbs)]]
 
           (when show-components?
-            [:& components-box {:file file
-                                :local? local?
-                                :components components
-                                :listing-thumbs? listing-thumbs?
-                                :open? (open-box? :components)
-                                :open-groups (open-groups :components)
-                                :reverse-sort? reverse-sort?
-                                :selected-assets selected-assets
-                                :on-asset-click (partial on-asset-click :components)
-                                :on-assets-delete on-assets-delete
-                                :on-clear-selection unselect-all}])
+            [:& components-box
+             {:file file
+              :file-id file-id
+              :local? local?
+              :components components
+              :listing-thumbs? listing-thumbs?
+              :open? (open-box? :components)
+              :open-groups (open-groups :components)
+              :reverse-sort? reverse-sort?
+              :selected-assets selected-assets
+              :on-asset-click (partial on-asset-click :components)
+              :on-assets-delete on-assets-delete
+              :on-clear-selection on-clear-selection}])
 
           (when show-graphics?
-            [:& graphics-box {:file-id (:id file)
-                              :project-id (:project-id file)
-                              :local? local?
-                              :objects media
-                              :listing-thumbs? listing-thumbs?
-                              :open? (open-box? :graphics)
-                              :open-groups (open-groups :graphics)
-                              :reverse-sort? reverse-sort?
-                              :selected-assets selected-assets
-                              :on-asset-click (partial on-asset-click :graphics)
-                              :on-assets-delete on-assets-delete
-                              :on-clear-selection unselect-all}])
+            [:& graphics-box
+             {:file-id file-id
+              :project-id project-id
+              :local? local?
+              :objects media
+              :listing-thumbs? listing-thumbs?
+              :open? (open-box? :graphics)
+              :open-groups (open-groups :graphics)
+              :reverse-sort? reverse-sort?
+              :selected-assets selected-assets
+              :on-asset-click (partial on-asset-click :graphics)
+              :on-assets-delete on-assets-delete
+              :on-clear-selection on-clear-selection}])
+
           (when show-colors?
-            [:& colors-box {:file-id (:id file)
-                            :local? local?
-                            :colors colors
-                            :open? (open-box? :colors)
-                            :open-groups (open-groups :colors)
-                            :reverse-sort? reverse-sort?
-                            :selected-assets selected-assets
-                            :on-asset-click (partial on-asset-click :colors)
-                            :on-assets-delete on-assets-delete
-                            :on-clear-selection unselect-all}])
+            [:& colors-box
+             {:file-id file-id
+              :local? local?
+              :colors colors
+              :open? (open-box? :colors)
+              :open-groups (open-groups :colors)
+              :reverse-sort? reverse-sort?
+              :selected-assets selected-assets
+              :on-asset-click (partial on-asset-click :colors)
+              :on-assets-delete on-assets-delete
+              :on-clear-selection on-clear-selection}])
 
           (when show-typography?
-            [:& typographies-box {:file file
-                                  :file-id (:id file)
-                                  :local? local?
-                                  :typographies typographies
+            [:& typographies-box
+             {:file file
+              :file-id (:id file)
+              :local? local?
+              :typographies typographies
                                   :open? (open-box? :typographies)
                                   :open-groups (open-groups :typographies)
                                   :reverse-sort? reverse-sort?
                                   :selected-assets selected-assets
                                   :on-asset-click (partial on-asset-click :typographies)
                                   :on-assets-delete on-assets-delete
-                                  :on-clear-selection unselect-all}])
+                                  :on-clear-selection on-clear-selection}])
 
           (when (and (not show-components?) (not show-graphics?) (not show-colors?) (not show-typography?))
             [:div.asset-section
-             [:div.asset-title (tr "workspace.assets.not-found")]])]))]]))
+             [:div.asset-title (tr "workspace.assets.not-found")]])]))
+
+
+
+(mf/defc file-library
+  {::mf/wrap-props false}
+  [props]
+  (let [file            (unchecked-get props "file")
+        local?          (unchecked-get props "local?")
+        default-open?   (unchecked-get props "default-open?")
+        filters         (unchecked-get props "filters")
+
+        file-id         (:id file)
+        file-name       (:name file)
+        shared?         (:is-shared file)
+        project-id      (:project-id file)
+        page-id         (dm/get-in file [:data :pages 0])
+
+        open-status-ref (mf/with-memo [file-id]
+                          (-> (l/key file-id)
+                              (l/derived ref:open-status)))
+        open-status      (mf/deref open-status-ref)
+        open?            (d/nilv (:library open-status) default-open?)
+
+        unselect-all
+        (mf/use-fn
+         (fn []
+           (st/emit! (dw/unselect-all-assets))))
+
+        ]
+
+
+    [:& perf/profiler {:enabled false :label "sidebar/file-library"}
+     [:div.tool-window {:on-context-menu dom/prevent-default
+                        :on-click unselect-all}
+      [:& file-library-title
+       {:project-id project-id
+        :file-id file-id
+        :page-id page-id
+        :file-name file-name
+        :open? open?
+        :local? local?
+        :shared? shared?}]
+      (when open?
+       [:& file-library-content
+        {:file file
+         :local? local?
+         :filters filters}])]]))
 
 (mf/defc assets-libraries
   {::mf/wrap [mf/memo]}
@@ -2290,23 +2350,25 @@
         libraries (mf/with-memo [libraries]
                     (->> (vals libraries)
                          (remove :is-indirect)
+                         (map (fn [file]
+                                (update file :data dissoc :pages-index)))
                          (sort-by #(str/lower (:name %)))))]
-    [:*
-     (for [file libraries]
-       [:& file-library
-        {:key (dm/str (:id file))
-         :file file
-         :local? false
-         :default-open? false
-         :filters filters}])]))
+    (for [file libraries]
+      [:& file-library
+       {:key (dm/str (:id file))
+        :file file
+        :local? false
+        :default-open? false
+        :filters filters}])))
 
 (mf/defc assets-local-library
   {::mf/wrap [mf/memo]}
   [{:keys [filters]}]
-  ;; FIXME: revisit, we dont need to change on each file change
-  (let [file (mf/deref refs/workspace-file)]
+  (let [{:keys [id] :as file} (mf/deref refs/workspace-file)
+        trimmed-file          (mf/with-memo [id]
+                                (update file :data dissoc :pages-index))]
     [:& file-library
-     {:file file
+     {:file trimmed-file
       :local? true
       :default-open? true
       :filters filters}]))
@@ -2315,8 +2377,8 @@
   {::mf/wrap [mf/memo]}
   []
   (prn "assets-toolbox")
-  (let [workspace-read-only? (mf/use-ctx ctx/workspace-read-only?)
-        filters              (mf/use-state {:term "" :box :all})
+  (let [read-only? (mf/use-ctx ctx/workspace-read-only?)
+        filters    (mf/use-state {:term "" :box :all})
 
         on-search-term-change
         (mf/use-fn
@@ -2345,7 +2407,10 @@
                  node   (dom/event->target event)]
 
              (when enter? (dom/blur! node))
-             (when esc?   (dom/blur! node)))))]
+             (when esc?   (dom/blur! node)))))
+
+        show-libraries-dialog
+        (mf/use-fn #(modal/show! :libraries-dialog {}))]
 
     [:& perf/profiler {:enabled false :label "sidebar/assets"}
      [:div.assets-bar
@@ -2353,8 +2418,8 @@
        [:div.tool-window-content
         [:div.assets-bar-title
          (tr "workspace.assets.assets")
-         (when-not workspace-read-only?
-           [:div.libraries-button {:on-click #(modal/show! :libraries-dialog {})}
+         (when-not read-only?
+           [:div.libraries-button {:on-click show-libraries-dialog}
             i/text-align-justify
             (tr "workspace.assets.libraries")])]
 

@@ -187,17 +187,8 @@
 (def editing-page-item
   (l/derived :page-item workspace-local))
 
-(def file-library-listing-thumbs?
-  (l/derived :file-library-listing-thumbs workspace-global))
-
-(def file-library-reverse-sort?
-  (l/derived :file-library-reverse-sort workspace-global))
-
 (def current-hover-ids
   (l/derived :hover-ids context-menu))
-
-(def selected-assets
-  (l/derived :selected-assets workspace-global))
 
 (def workspace-layout
   (l/derived :workspace-layout st/state))
