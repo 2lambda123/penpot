@@ -160,7 +160,9 @@
         text-pos-x (if (or (:use-for-thumbnail? frame) grid-edition?) 15 0)]
 
     (when (not (:hidden frame))
-      [:g.frame-title {:id (dm/str "frame-title-" (:id frame)) :transform (vwu/title-transform frame zoom grid-edition?)}
+      [:g.frame-title {:id (dm/str "frame-title-" (:id frame))
+                       :data-edit-grid grid-edition?
+                       :transform (vwu/title-transform frame zoom grid-edition?)}
        (cond
          (or (:use-for-thumbnail? frame) grid-edition?)
          [:svg {:x 0
