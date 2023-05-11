@@ -625,21 +625,25 @@
                   (empty? components)
                   (some? groups))
              [:div.drop-space])
+
            (for [component components]
-             [:& components-item {:component component
-                                  :key (:id component)
-                                  :renaming renaming
-                                  :listing-thumbs? listing-thumbs?
-                                  :file file
-                                  :selected-components selected-components
-                                  :on-asset-click on-asset-click
-                                  :on-context-menu on-context-menu
-                                  :on-drag-start on-drag-start
-                                  :on-group on-group
-                                  :do-rename do-rename
-                                  :cancel-rename cancel-rename
-                                  :selected-components-full selected-components-full
-                                  :selected-components-paths selected-components-paths}])])
+             [:& components-item
+              {:component component
+               :key (:id component)
+               :renaming renaming
+               :listing-thumbs? listing-thumbs?
+               :file file
+               :file-id file-id
+               :selected selected
+               :selected-full selected-full
+               :selected-paths selected-paths
+               :on-asset-click on-asset-click
+               :on-context-menu on-context-menu
+               :on-drag-start on-drag-start
+               :on-group on-group
+               :do-rename do-rename
+               :cancel-rename cancel-rename}])])
+
         (for [[path-item content] groups]
           (when-not (empty? path-item)
             [:& components-group {:file file
@@ -650,7 +654,7 @@
                                   :open-groups open-groups
                                   :renaming renaming
                                   :listing-thumbs? listing-thumbs?
-                                  :selected-components selected-components
+                                  :selected selected
                                   :on-asset-click on-asset-click
                                   :on-drag-start on-drag-start
                                   :do-rename do-rename
@@ -658,7 +662,7 @@
                                   :on-rename-group on-rename-group
                                   :on-ungroup on-ungroup
                                   :on-context-menu on-context-menu
-                                  :selected-components-full selected-components-full}]))])]))
+                                  :selected-full selected-full}]))])]))
 
 (mf/defc components-box
   [{:keys [file file-id local? components listing-thumbs? open? reverse-sort? open-groups selected-assets
@@ -668,11 +672,11 @@
                                                 :component-id nil})
 
         menu-state               (mf/use-state auto-pos-menu-state)
-        workspace-read-only?     (mf/use-ctx ctx/workspace-read-only?)
+        read-only?               (mf/use-ctx ctx/workspace-read-only?)
 
-        selected-components      (:components selected-assets)
-        selected-components-full (filter #(contains? selected-components (:id %)) components)
-        multi-components?        (> (count selected-components) 1)
+        selected                 (:components selected-assets)
+        selected-full            (filter #(contains? selected (:id %)) components)
+        multi-components?        (> (count selected) 1)
         multi-assets?            (or (seq (:graphics selected-assets))
                                      (seq (:colors selected-assets))
                                      (seq (:typographies selected-assets)))
@@ -702,11 +706,11 @@
          (mf/deps @state)
          (fn []
            (let [undo-id (js/Symbol)]
-             (if (empty? selected-components)
+             (if (empty? selected)
                (st/emit! (dwl/duplicate-component file-id (:component-id @state)))
                (do
                  (st/emit! (dwu/start-undo-transaction undo-id))
-                 (apply st/emit! (map (partial dwl/duplicate-component file-id) selected-components))
+                 (apply st/emit! (map (partial dwl/duplicate-component file-id) selected))
                  (st/emit! (dwu/commit-undo-transaction undo-id)))))))
 
         on-delete
