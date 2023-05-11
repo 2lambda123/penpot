@@ -465,6 +465,7 @@
 ;; and has a dropdown that behaves like a modal but is not a modal.
 ;; In summary, this need to a good UX/UI/IMPL rework.
 
+;; FIXME: breaks react hooks rules with open?
 (mf/defc typography-entry
   [{:keys [typography local? selected? on-click on-change on-detach on-context-menu editing? focus-name? file open?]}]
   (let [hover-detach         (mf/use-state false)

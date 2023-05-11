@@ -393,7 +393,10 @@
     :gen/gen (sg/small-int)
     ::oapi/type "integer"
     ::oapi/format "int64"
-    ::oapi/decode parse-long}})
+    ::oapi/decode (fn [s]
+                    (if (string? s)
+                      (parse-long s)
+                      s))}})
 
 (def! ::safe-number
   {:type ::safe-number
@@ -406,7 +409,10 @@
                         (sg/small-double))
     ::oapi/type "number"
     ::oapi/format "double"
-    ::oapi/decode parse-double}})
+    ::oapi/decode (fn [s]
+                    (if (string? s)
+                      (parse-double s)
+                      s))}})
 
 (def! ::safe-double
   {:type ::safe-double
@@ -418,7 +424,10 @@
     :gen/gen (sg/small-double)
     ::oapi/type "number"
     ::oapi/format "double"
-    ::oapi/decode parse-double}})
+    ::oapi/decode (fn [s]
+                    (if (string? s)
+                      (parse-double s)
+                      s))}})
 
 (def! ::contains-any
   {:type ::contains-any
