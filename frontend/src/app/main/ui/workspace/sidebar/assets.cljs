@@ -144,20 +144,20 @@
      'group2': {'subgroup21': {'': [{asset21A}}}}
   "
   [assets reverse-sort?]
-  (letfn [(sort-key [key1 key2]
-            (if reverse-sort?
-              (compare (d/name key2) (d/name key1))
-              (compare (d/name key1) (d/name key2))))]
-    (when-not (empty? assets)
-      (reduce (fn [groups asset]
-                (let [path-vector (cph/split-path (or (:path asset) ""))]
-                  (update-in groups (conj path-vector "")
-                             (fn [group]
-                               (if-not group
-                                 [asset]
-                                 (conj group asset))))))
-              (sorted-map-by sort-key)
-              assets))))
+  (when-not (empty? assets)
+    (reduce (fn [groups {:keys [path] :as asset}]
+              (let [path (cph/split-path (or path ""))]
+                (update-in groups
+                           (conj path "")
+                           (fn [group]
+                             (if group
+                               (conj group asset)
+                               [asset])))))
+            (sorted-map-by (fn [key1 key2]
+                             (if reverse-sort?
+                               (compare key2 key1)
+                               (compare key1 key2))))
+            assets)))
 
 (defn add-group
   [asset group-name]
@@ -455,7 +455,7 @@
            file-id file on-asset-click on-context-menu on-drag-start do-rename
            cancel-rename selected-full selected-paths] :as props}]
 
-  (prn "components-item" (:name component))
+  ;; (prn "components-item" (:name component))
   (let [item-ref       (mf/use-ref)
         dragging?      (mf/use-state false)
         read-only?     (mf/use-ctx ctx/workspace-read-only?)
@@ -570,8 +570,8 @@
         dragging? (mf/use-state false)
 
         selected-paths (->> selected-full
-                                       (map #(:path %))
-                                       (map #(if (nil? %) "" %)))
+                            (map #(:path %))
+                            (map #(if (nil? %) "" %)))
 
         on-drag-enter
         (mf/use-fn
@@ -665,11 +665,19 @@
                                   :selected-full selected-full}]))])]))
 
 (mf/defc components-box
-  [{:keys [file file-id local? components listing-thumbs? open? reverse-sort? open-groups selected-assets
-           on-asset-click on-assets-delete on-clear-selection] :as props}]
+  {::mf/wrap-props false}
+  [{:keys [file file-id local? components listing-thumbs? open? reverse-sort? selected-assets
+           on-asset-click on-assets-delete on-clear-selection open-status-ref]}]
+
   (let [input-ref                (mf/use-ref nil)
         state                    (mf/use-state {:renaming nil
                                                 :component-id nil})
+
+        open-groups-ref          (mf/with-memo []
+                                   (-> (l/in [:groups :components])
+                                       (l/derived open-status-ref)))
+
+        open-groups              (mf/deref open-groups-ref)
 
         menu-state               (mf/use-state auto-pos-menu-state)
         read-only?               (mf/use-ctx ctx/workspace-read-only?)
@@ -681,9 +689,13 @@
                                      (seq (:colors selected-assets))
                                      (seq (:typographies selected-assets)))
 
-        groups                   (group-assets components reverse-sort?)
+        groups                   (mf/with-memo [components reverse-sort?]
+                                   (group-assets components reverse-sort?))
 
         components-v2            (mf/use-ctx ctx/components-v2)
+
+        ;; _ (prn "open-groups1" open-groups)
+        ;; _ (prn "open-groups2" open-groups)
 
         add-component
         (mf/use-fn
@@ -727,9 +739,9 @@
 
         on-rename
         (mf/use-fn
-         (mf/deps @state)
          (fn []
-           (swap! state assoc :renaming (:component-id @state))))
+           (swap! state (fn [state]
+                          (assoc state :renaming (:component-id state))))))
 
         do-rename
         (mf/use-fn
@@ -814,12 +826,10 @@
            (on-clear-selection)
            (let [undo-id (js/Symbol)]
              (st/emit! (dwu/start-undo-transaction undo-id))
-             (apply st/emit!
-                    (->> components
-                         (filter #(str/starts-with? (:path %) path))
-                         (map #(dwl/rename-component
-                                (:id %)
-                                (ungroup % path)))))
+             (run! st/emit!
+                   (->> components
+                        (filter #(str/starts-with? (:path %) path))
+                        (map #(dwl/rename-component (:id %) (ungroup % path)))))
              (st/emit! (dwu/commit-undo-transaction undo-id)))))
 
         on-drag-start
@@ -2274,8 +2284,7 @@
          :listing-thumbs? listing-thumbs?
          :open? (open-box? :components)
          :open-status-ref open-status-ref
-         :open-groups (open-groups :components)
-
+         ;; :open-groups (open-groups :components)  ;; FIXME: remove from other components
          :reverse-sort? reverse-sort?
          :selected-assets selected-assets
          :on-asset-click (partial on-asset-click :components)
@@ -2417,7 +2426,7 @@
 (mf/defc assets-toolbox
   {::mf/wrap [mf/memo]}
   []
-  (prn "assets-toolbox")
+  ;; (prn "assets-toolbox")
   (let [read-only? (mf/use-ctx ctx/workspace-read-only?)
         filters    (mf/use-state
                     {:term ""
