@@ -202,10 +202,11 @@
                                 :value (tr "workspace.libraries.update")
                                 :on-click #(update-library (:id library))}]])]])]))
 
+;; FIXME: revisit
 (mf/defc libraries-dialog
   {::mf/register modal/components
    ::mf/register-as :libraries-dialog}
-  [{:keys [] :as ctx}]
+  []
   (let [selected-tab (mf/use-state :libraries)
         project      (mf/deref refs/workspace-project)
         file         (mf/deref workspace-file)
@@ -214,7 +215,7 @@
                           (d/removem (fn [[_ val]] (:is-indirect val))))
         shared-files (mf/deref refs/workspace-shared-files)
 
-        colors-ref           (mf/use-memo (mf/deps (:id file)) #(a/file-colors-ref (:id file)))
+        colors-ref           (mf/use-memo (mf/deps (:id file)) #(a/create-file-colors-ref (:id file)))
         colors               (mf/deref colors-ref)
 
         typography-ref       (mf/use-memo (mf/deps (:id file)) #(a/file-typography-ref (:id file)))

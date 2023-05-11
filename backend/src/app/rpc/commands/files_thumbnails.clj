@@ -102,6 +102,7 @@
      :file-id (:file-id row)}))
 
 (s/def ::revn ::us/integer)
+(s/def ::file-id ::us/uuid)
 
 (s/def ::get-file-thumbnail
   (s/keys :req [::rpc/profile-id]

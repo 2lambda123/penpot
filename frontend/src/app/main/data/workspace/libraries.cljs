@@ -75,6 +75,7 @@
 
 (declare sync-file)
 
+;; FIXME: rename box for section
 (defn set-assets-box-open
   [file-id box open?]
   (ptk/reify ::set-assets-box-open

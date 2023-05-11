@@ -203,10 +203,8 @@
                      data (:workspace-data state)]
                  (-> file
                      (dissoc :data)
-                     (assoc :options (:options data)
-                            :components (:components data)
-                            :pages (:pages data)
-                            :pages-index (:pages-index data)))))
+                     ;; FIXME: used in sitemaps, but should not be used
+                     (assoc :pages (:pages data)))))
              st/state =))
 
 (def workspace-data
