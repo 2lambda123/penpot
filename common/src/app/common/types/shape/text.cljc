@@ -7,7 +7,6 @@
 (ns app.common.types.shape.text
   (:require
    [app.common.schema :as sm]
-   [app.common.types.color :as ctc]
    [app.common.types.shape :as-alias shape]
    [app.common.types.shape.text.position-data :as-alias position-data]))
 

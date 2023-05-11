@@ -8,7 +8,6 @@
   (:refer-clojure :exclude [deref merge parse-uuid])
   #?(:cljs (:require-macros [app.common.schema :refer [ignoring]]))
   (:require
-   [app.common.data :as d]
    [app.common.data.macros :as dm]
    [app.common.schema.generators :as sg]
    [app.common.schema.openapi :as-alias oapi]
