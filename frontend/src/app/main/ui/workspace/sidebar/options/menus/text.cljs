@@ -159,10 +159,11 @@
        :on-click #(handle-change % "line-through")}
       i/strikethrough]]))
 
-(defn generate-typography-name
-  [{:keys [font-id font-variant-id] :as typography}]
-  (let [{:keys [name]} (fonts/get-font-data font-id)]
-    (assoc typography :name (str name " " (str/title font-variant-id)))))
+;; ;; FIXME: reuse one defined in data.work
+;; (defn generate-typography-name
+;;   [{:keys [font-id font-variant-id] :as typography}]
+;;   (let [{:keys [name]} (fonts/get-font-data font-id)]
+;;     (assoc typography :name (str name " " (str/title font-variant-id)))))
 
 (mf/defc text-menu
   {::mf/wrap [mf/memo]}
@@ -215,7 +216,7 @@
                                               dwt/text-spacing-attrs
                                               dwt/text-transform-attrs)))
                 typography (merge txt/default-typography set-values)
-                typography (generate-typography-name typography)
+                typography (dwt/generate-typography-name typography)
                 id         (uuid/next)]
             (st/emit! (dwl/add-typography (assoc typography :id id) false))
             (run! #(emit-update! % {:typography-ref-id id

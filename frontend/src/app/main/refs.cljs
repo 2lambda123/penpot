@@ -384,9 +384,7 @@
 
 (def selected-objects
   (letfn [(selector [{:keys [selected objects]}]
-            (->> selected
-                 (map #(get objects %))
-                 (filterv (comp not nil?))))]
+            (into [] (keep (d/getf objects)) selected))]
     (l/derived selector selected-data =)))
 
 (def selected-shapes-with-children
