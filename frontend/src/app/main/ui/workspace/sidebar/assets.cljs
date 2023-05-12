@@ -37,7 +37,6 @@
    [app.main.ui.context :as ctx]
    [app.main.ui.hooks :as h]
    [app.main.ui.icons :as i]
-   ;; [app.main.ui.workspace.sidebar.options.menus.text :refer [generate-typography-name]]
    [app.main.ui.workspace.sidebar.options.menus.typography :refer [typography-entry]]
    [app.util.color :as uc]
    [app.util.dom :as dom]
@@ -1341,11 +1340,15 @@
 
         ;; FIXME: revisit this
         edit-color
-        (fn [new-color]
-          (let [old-data (-> (select-keys color [:id :file-id])
-                             (assoc :name (cph/merge-path-item (:path color) (:name color))))
-                updated-color (merge new-color old-data)]
-            (st/emit! (dwl/update-color updated-color file-id))))
+        (mf/use-fn
+         (mf/deps color file-id)
+         (fn [attrs]
+           (let [name  (cph/merge-path-item (:path color) (:name color))
+                 color (-> attrs
+                           (assoc :id (:id color))
+                           (assoc :file-id file-id)
+                           (assoc :name name))]
+             (st/emit! (dwl/update-color color file-id)))))
 
         delete-color
         (mf/use-fn
@@ -2286,8 +2289,6 @@
 
         on-asset-click
         (mf/use-fn
-         ;; FIXME: looks not needed this deps
-         #_(mf/deps selected-assets)
          (fn [asset-type asset-groups asset-id default-click event]
            (cond
              (kbd/mod? event)
