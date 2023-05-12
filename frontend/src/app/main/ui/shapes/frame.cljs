@@ -97,12 +97,13 @@
        [:image.frame-thumbnail
         {:id (dm/str "thumbnail-" (:id shape))
          :href (:thumbnail shape)
+         :decoding "async"
          :x (:x bounds)
          :y (:y bounds)
          :width (:width bounds)
          :height (:height bounds)
          ;; DEBUG
-         :style {:filter (when (and (not (cf/check-browser? :safari))(debug? :thumbnails)) "sepia(1)")}}]
+         :style {:filter (when (and (not (cf/check-browser? :safari)) (debug? :thumbnails)) "sepia(1)")}}]
 
        ;; Safari don't support filters so instead we add a rectangle around the thumbnail
        (when (and (cf/check-browser? :safari) (debug? :thumbnails))

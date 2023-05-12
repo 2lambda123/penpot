@@ -18,30 +18,10 @@
    [app.main.ui.shapes.frame :as frame]
    [app.util.dom :as dom]
    [app.util.timers :as ts]
-   [app.util.webapi :as wapi]
    [beicon.core :as rx]
    [cuerdas.core :as str]
    [debug :refer [debug?]]
-   [promesa.core :as p]
    [rumext.v2 :as mf]))
-
-(defn- draw-thumbnail-canvas!
-  [canvas-node img-node]
-  (try
-    (when (and (some? canvas-node) (some? img-node))
-      (let [canvas-context (.getContext canvas-node "2d")
-            canvas-width   (.-width canvas-node)
-            canvas-height  (.-height canvas-node)]
-        (.clearRect canvas-context 0 0 canvas-width canvas-height)
-        (.drawImage canvas-context img-node 0 0 canvas-width canvas-height)
-
-        ;; Set a true on the next animation frame, we make sure the drawImage is completed
-        (ts/raf
-         #(dom/set-data! canvas-node "ready" "true"))
-        true))
-    (catch :default err
-      (.error js/console err)
-      false)))
 
 (defn- remove-image-loading
   "Remove the changes related to change a url for its embed value. This is necessary
@@ -57,19 +37,38 @@
                          (str/starts-with? (.-oldValue change) "http"))))))
     [value]))
 
+(defn- create-svg-blob-uri-from
+  [fixed-width fixed-height rect node style-node]
+  (let [{:keys [x y width height]} rect
+        viewbox (dm/str x " " y " " width " " height)
+
+        ;; This is way faster than creating a node 
+        ;; through the DOM API
+        svg-data
+        (dm/fmt "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" viewBox=\"%\" width=\"%\" height=\"%\" fill=\"none\">% %</svg>"
+                viewbox
+                fixed-width
+                fixed-height
+                (if (some? style-node) (dom/node->xml style-node) "")
+                (dom/node->xml node))
+
+        ;; create SVG blob
+        blob (js/Blob. #js [svg-data] #js {:type "image/svg+xml;charset=utf-8"})
+        url  (dm/str (.createObjectURL js/URL blob) "#svg")]
+    ;; returns the url and the node
+    url))
+
 (defn use-render-thumbnail
-  "Hook that will create the thumbnail thata"
+  "Hook that will create the thumbnail data"
   [page-id {:keys [id] :as shape} node-ref rendered? disable? force-render]
 
-  (let [frame-canvas-ref (mf/use-ref nil)
-        frame-image-ref (mf/use-ref nil)
-
-        disable-ref? (mf/use-var disable?)
+  (let [frame-image-ref (mf/use-ref nil)
+        disable-ref?    (mf/use-var disable?)
 
         regenerate-thumbnail (mf/use-var false)
 
         all-children-ref (mf/use-memo (mf/deps id) #(refs/all-children-objects id))
-        all-children (mf/deref all-children-ref)
+        all-children     (mf/deref all-children-ref)
 
         {:keys [x y width height] :as shape-bb}
         (if (:show-content shape)
@@ -83,51 +82,43 @@
           [(/ (* width (mth/clamp height 250 2000)) height)
            (mth/clamp height 250 2000)])
 
-        image-url    (mf/use-state nil)
+        svg-uri      (mf/use-state nil)
+        bitmap-uri   (mf/use-state nil)
         observer-ref (mf/use-var nil)
-
         shape-bb-ref (hooks/use-update-var shape-bb)
-
         updates-str  (mf/use-memo #(rx/subject))
 
-        thumbnail-data-ref (mf/use-memo (mf/deps page-id id) #(refs/thumbnail-frame-data page-id id))
-        thumbnail-data     (mf/deref thumbnail-data-ref)
-
-        ;; We only need the zoom level in Safari. For other browsers we don't want to activate this because
-        ;; will render for every zoom change
-        zoom (when (cf/check-browser? :safari) (mf/deref refs/selected-zoom))
-
-        prev-thumbnail-data (hooks/use-previous thumbnail-data)
+        thumbnail-uri-ref (mf/use-memo (mf/deps page-id id) #(refs/thumbnail-frame-data page-id id))
+        thumbnail-uri     (mf/deref thumbnail-uri-ref)
 
         ;; State to indicate to the parent that should render the frame
-        render-frame? (mf/use-state (not thumbnail-data))
+        render-frame? (mf/use-state (not thumbnail-uri))
 
-        ;; State variable to select whether we show the image thumbnail or the canvas thumbnail
-        show-frame-thumbnail (mf/use-state (some? thumbnail-data))
-
-        disable-fills? (or @show-frame-thumbnail (some? @image-url))
-
-        on-image-load
+        on-bitmap-load
         (mf/use-callback
-         (mf/deps @show-frame-thumbnail)
          (fn []
-           (let [canvas-node (mf/ref-val frame-canvas-ref)
-                 img-node    (mf/ref-val frame-image-ref)]
-             (when (draw-thumbnail-canvas! canvas-node img-node)
-               (when-not (cf/check-browser? :safari)
-                 (reset! image-url nil))
+           ;; We revoke the SVG Blob URI to free memory
+           ;; only when we are sure that it is not used 
+           ;; anymore.
+           (.revokeObjectURL js/URL @svg-uri)
+           (reset! svg-uri nil)))
+        
+        on-svg-load
+        (mf/use-callback
+         (fn []
+           ;; FIXME: discriminate #svg blob uris from #bitmap uris
+           (let [image-node (mf/ref-val frame-image-ref)]
+             (dom/set-data! image-node "ready" "true")
 
-               (when @show-frame-thumbnail
-                 (reset! show-frame-thumbnail false))
-               ;; If we don't have the thumbnail data saved (normally the first load) we update the data
-               ;; when available
-               (when (not @thumbnail-data-ref)
-                 (st/emit! (dwt/update-thumbnail page-id id) ))
+             ;; If we don't have the thumbnail data saved (normally the first load) we update the data
+             ;; when available
+             (when (not @thumbnail-uri-ref)
+               (st/emit! (dwt/update-thumbnail page-id id)))
 
-               (reset! render-frame? false)))))
+             (reset! render-frame? false))))
 
         generate-thumbnail
-        (mf/use-callback
+        (mf/use-fn
          (fn generate-thumbnail []
            (try
              ;; When starting generating the canvas we mark it as not ready so its not send to back until
@@ -136,23 +127,8 @@
                (if (dom/has-children? node)
                  ;; The frame-content need to have children in order to generate the thumbnail
                  (let [style-node (dom/query (dm/str "#frame-container-" (:id shape) " style"))
-
-                       {:keys [x y width height]} @shape-bb-ref
-                       viewbox (dm/str x " " y " " width " " height)
-
-                       ;; This is way faster than creating a node through the DOM API
-                       svg-data
-                       (dm/fmt "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" viewBox=\"%\" width=\"%\" height=\"%\" fill=\"none\">% %</svg>"
-                               viewbox
-                               width
-                               height
-                               (if (some? style-node) (dom/node->xml style-node) "")
-                               (dom/node->xml node))
-
-                       blob (js/Blob. #js [svg-data] #js {:type "image/svg+xml;charset=utf-8"})
-
-                       img-src (.createObjectURL js/URL blob)]
-                   (reset! image-url img-src))
+                       url  (create-svg-blob-uri-from fixed-width fixed-height @shape-bb-ref node style-node)]
+                   (reset! svg-uri url))
 
                  ;; Node not yet ready, we schedule a new generation
                  (ts/schedule generate-thumbnail)))
@@ -161,7 +137,7 @@
                (.error js/console e)))))
 
         on-change-frame
-        (mf/use-callback
+        (mf/use-fn
          (fn []
            (when (and (some? @node-ref) @rendered? @regenerate-thumbnail)
              (let [loading-images? (some? (dom/query @node-ref "[data-loading='true']"))
@@ -170,21 +146,24 @@
                  (generate-thumbnail)
                  (reset! regenerate-thumbnail false))))))
 
+        ;; When the frame is updated, it is marked as not ready 
+        ;; so that it is not sent to the background until 
+        ;; it is regenerated.
         on-update-frame
-        (mf/use-callback
+        (mf/use-fn
          (fn []
-           (let [canvas-node (mf/ref-val frame-canvas-ref)]
-             (when (not= "false" (dom/get-data canvas-node "ready"))
-               (dom/set-data! canvas-node "ready" "false")))
+           (let [image-node (mf/ref-val frame-image-ref)]
+             (when (not= "false" (dom/get-data image-node "ready"))
+               (dom/set-data! image-node "ready" "false")))
            (when (not @disable-ref?)
              (reset! render-frame? true)
              (reset! regenerate-thumbnail true))))
 
         on-load-frame-dom
-        (mf/use-callback
+        (mf/use-fn
          (fn [node]
            (when (and (some? node) (nil? @observer-ref))
-             (when-not (some? @thumbnail-data-ref)
+             (when-not (some? @thumbnail-uri-ref)
                (rx/push! updates-str :update))
 
              (let [observer (js/MutationObserver. (partial rx/push! updates-str))]
@@ -192,11 +171,11 @@
                (reset! observer-ref observer)))))]
 
     (mf/use-effect
-     (mf/deps thumbnail-data)
+     (mf/deps thumbnail-uri)
      (fn []
-       (when (and (some? prev-thumbnail-data) (nil? thumbnail-data))
-         (rx/push! updates-str :update))))
-
+       (when (some? thumbnail-uri)
+         (reset! bitmap-uri thumbnail-uri))))
+    
     (mf/use-effect
      (mf/deps force-render)
      (fn []
@@ -239,51 +218,13 @@
             (.disconnect @observer-ref)
             (reset! observer-ref nil)))))
 
-    ;; When the thumbnail-data is empty we regenerate the thumbnail
-    (mf/use-effect
-     (mf/deps (:selrect shape) thumbnail-data)
-     (fn []
-       (let [{:keys [width height]} (:selrect shape)]
-         (p/then (wapi/empty-png-size width height)
-                 (fn [data]
-                   (when (<= (count thumbnail-data) (+ 100 (count data)))
-                     (rx/push! updates-str :update)))))))
-
     [on-load-frame-dom
      @render-frame?
      (mf/html
       [:& frame/frame-container {:bounds shape-bb
                                  :shape (cond-> shape
-                                          (some? thumbnail-data)
-                                          (assoc :thumbnail thumbnail-data))}
-
-       (when @show-frame-thumbnail
-         [:> frame/frame-thumbnail-image
-          {:key (dm/str (:id shape))
-           :bounds shape-bb
-           :shape (cond-> shape
-                    (some? thumbnail-data)
-                    (assoc :thumbnail thumbnail-data))}])
-
-       [:foreignObject {:x x
-                        :y y
-                        :width width
-                        :height height
-                        :opacity (when disable-fills? 0)}
-        [:canvas.thumbnail-canvas
-         {:key (dm/str "thumbnail-canvas-" (:id shape))
-          :ref frame-canvas-ref
-          :data-object-id (dm/str page-id (:id shape))
-          :width width
-          :height height
-          :style {;; Safari has a problem with the positioning of the canvas. All this is to fix Safari behavior
-                  ;; https://bugs.webkit.org/show_bug.cgi?id=23113
-                  :display (when (cf/check-browser? :safari) "none")
-                  :position "fixed"
-                  :transform-origin "top left"
-                  :transform (when (cf/check-browser? :safari) (dm/fmt "scale(%)" zoom))
-                  ;; DEBUG
-                  :filter (when (debug? :thumbnails) "invert(1)")}}]]
+                                          (some? thumbnail-uri)
+                                          (assoc :thumbnail thumbnail-uri))}
 
        ;; Safari don't support filters so instead we add a rectangle around the thumbnail
        (when (and (cf/check-browser? :safari) (debug? :thumbnails))
@@ -294,13 +235,34 @@
                  :stroke "blue"
                  :stroke-width 2}])
 
-       (when (some? @image-url)
-         [:foreignObject {:x x
-                          :y y
-                          :width fixed-width
-                          :height fixed-height}
-          [:img {:ref frame-image-ref
-                 :src @image-url
-                 :width fixed-width
-                 :height fixed-height
-                 :on-load on-image-load}]])])]))
+       ;; This is similar to how double-buffering works.
+       ;; In svg-uri we keep the SVG image that is used to
+       ;; render the bitmap until the bitmap is ready
+       ;; to be rendered on screen. Then we remove the
+       ;; svg and keep the bitmap one.
+       ;; This is the "buffer" that keeps the bitmap image.
+       (when (some? @bitmap-uri)
+         [:image.thumbnail-bitmap
+          {:x x
+           :y y
+           :width width
+           :height height
+           :href @bitmap-uri
+           ;; DEBUG
+           :style {:filter (when (debug? :thumbnails) "sepia(1)")}
+           :on-load on-bitmap-load}])
+
+       ;; This is the "buffer" that keeps the SVG image.
+       (when (some? @svg-uri)
+         [:image.thumbnail-canvas
+          {:x x
+           :y y
+           :key (dm/str "thumbnail-canvas-" (:id shape))
+           :data-object-id (dm/str page-id (:id shape))
+           :width width
+           :height height
+           :ref frame-image-ref
+           :href @svg-uri
+           ;; DEBUG
+           :style {:filter (when (debug? :thumbnails) "sepia(0.5)")}
+           :on-load on-svg-load}])])]))

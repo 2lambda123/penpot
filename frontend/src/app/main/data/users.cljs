@@ -539,7 +539,7 @@
   (ptk/reify ::fetch-access-tokens
     ptk/WatchEvent
     (watch [_ _ _]
-      (->> (rp/command! :get-access-tokens)
+      (->> (rp/cmd! :get-access-tokens)
            (rx/map access-tokens-fetched)))))
 
 ;; --- EVENT: create-access-token
@@ -559,7 +559,7 @@
       (let [{:keys [on-success on-error]
              :or {on-success identity
                   on-error rx/throw}} (meta params)]
-        (->> (rp/command! :create-access-token params)
+        (->> (rp/cmd! :create-access-token params)
              (rx/map access-token-created)
              (rx/tap on-success)
              (rx/catch on-error))))))
@@ -575,6 +575,6 @@
       (let [{:keys [on-success on-error]
              :or {on-success identity
                   on-error rx/throw}} (meta params)]
-        (->> (rp/command! :delete-access-token params)
+        (->> (rp/cmd! :delete-access-token params)
              (rx/tap on-success)
              (rx/catch on-error))))))

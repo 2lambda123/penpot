@@ -168,7 +168,7 @@
     ptk/WatchEvent
     (watch [_ state _]
       (let [team-id (:current-team-id state)]
-        (->> (rp/command! :get-webhooks {:team-id team-id})
+        (->> (rp/cmd! :get-webhooks {:team-id team-id})
              (rx/map team-webhooks-fetched))))))
 
 ;; --- EVENT: fetch-projects
@@ -333,7 +333,7 @@
   (ptk/reify ::fetch-builtin-templates
     ptk/WatchEvent
     (watch [_ _ _]
-        (->> (rp/command :retrieve-list-of-builtin-templates)
+        (->> (rp/cmd! :retrieve-list-of-builtin-templates)
              (rx/map builtin-templates-fetched)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -586,7 +586,7 @@
             {:keys [on-success on-error]
              :or {on-success identity
                   on-error rx/throw}} (meta params)]
-        (->> (rp/command! :delete-webhook params)
+        (->> (rp/cmd! :delete-webhook params)
              (rx/tap on-success)
              (rx/catch on-error))))))
 
@@ -609,7 +609,7 @@
             {:keys [on-success on-error]
              :or {on-success identity
                   on-error rx/throw}} (meta params)]
-        (->> (rp/command! :update-webhook params)
+        (->> (rp/cmd! :update-webhook params)
              (rx/tap on-success)
              (rx/catch on-error))))))
 
@@ -628,7 +628,7 @@
             {:keys [on-success on-error]
              :or {on-success identity
                   on-error rx/throw}} (meta params)]
-        (->> (rp/command! :create-webhook params)
+        (->> (rp/cmd! :create-webhook params)
              (rx/tap on-success)
              (rx/catch on-error))))))
 
