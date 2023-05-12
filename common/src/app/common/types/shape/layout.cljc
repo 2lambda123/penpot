@@ -177,6 +177,11 @@
         parent (get objects parent-id)]
     (flex-layout? parent)))
 
+(defn grid-layout-immediate-child? [objects shape]
+  (let [parent-id (:parent-id shape)
+        parent (get objects parent-id)]
+    (grid-layout? parent)))
+
 (defn any-layout-immediate-child? [objects shape]
   (let [parent-id (:parent-id shape)
         parent (get objects parent-id)]
@@ -186,6 +191,11 @@
   (let [parent-id (dm/get-in objects [id :parent-id])
         parent (get objects parent-id)]
     (flex-layout? parent)))
+
+(defn grid-layout-immediate-child-id? [objects id]
+  (let [parent-id (dm/get-in objects [id :parent-id])
+        parent (get objects parent-id)]
+    (grid-layout? parent)))
 
 (defn any-layout-immediate-child-id? [objects id]
   (let [parent-id (dm/get-in objects [id :parent-id])
