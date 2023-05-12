@@ -1090,6 +1090,19 @@
             qparams    {:page-id page-id :layout (name layout)}]
         (rx/of (rt/nav :workspace pparams qparams))))))
 
+(defn navigate-to-library
+  "Open a new tab, and navigate to the workspace with the provided file"
+  [library-id]
+  (ptk/reify ::navigate-to-file
+    ptk/WatchEvent
+    (watch [_ state _]
+      (when-let [file (dm/get-in state [:workspace-libraries library-id])]
+        (let [params {:rname :workspace
+                      :path-params {:project-id (:project-id file)
+                                    :file-id (:id file)}
+                      :query-params {:page-id (dm/get-in file [:data :pages 0])}}]
+          (rx/of (rt/nav-new-window* params)))))))
+
 (defn check-in-asset
   [items element]
   (let [items (or items #{})]
@@ -2045,25 +2058,6 @@
       (let [local (-> (:workspace-local state)
                       (dissoc :page-item))]
         (assoc state :workspace-local local)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; File Library persistent settings
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-;; (defn set-file-library-listing-thumbs
-;;   [listing-thumbs?]
-;;   (ptk/reify ::set-file-library-listing-thumbs
-;;     ptk/UpdateEvent
-;;     (update [_ state]
-;;       (assoc-in state [:workspace-global :file-library-listing-thumbs] listing-thumbs?))))
-
-;; (defn set-file-library-reverse-sort
-;;   [reverse-sort?]
-;;   (ptk/reify ::set-file-library-reverse-sort
-;;     ptk/UpdateEvent
-;;     (update [_ state]
-;;       (assoc-in state [:workspace-global :file-library-reverse-sort] reverse-sort?))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Exports

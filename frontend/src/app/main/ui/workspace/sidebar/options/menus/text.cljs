@@ -159,12 +159,6 @@
        :on-click #(handle-change % "line-through")}
       i/strikethrough]]))
 
-;; ;; FIXME: reuse one defined in data.work
-;; (defn generate-typography-name
-;;   [{:keys [font-id font-variant-id] :as typography}]
-;;   (let [{:keys [name]} (fonts/get-font-data font-id)]
-;;     (assoc typography :name (str name " " (str/title font-variant-id)))))
-
 (mf/defc text-menu
   {::mf/wrap [mf/memo]}
   [{:keys [ids type values] :as props}]

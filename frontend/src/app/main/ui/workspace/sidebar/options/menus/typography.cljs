@@ -13,6 +13,7 @@
    [app.common.text :as txt]
    [app.main.data.fonts :as fts]
    [app.main.data.shortcuts :as dsc]
+   [app.main.data.workspace :as dw]
    [app.main.fonts :as fonts]
    [app.main.refs :as refs]
    [app.main.store :as st]
@@ -38,7 +39,7 @@
     (ust/format-precision value 2)))
 
 (defn select-all [event]
-  (dom/select-text! (dom/get-target event)))
+  (some-> event dom/get-target dom/select-text!))
 
 (defn- get-next-font
   [{:keys [id] :as current} fonts]
@@ -253,7 +254,8 @@
                     :current? (= (:id font) (:id selected))}])))
 
 (mf/defc font-options
-  [{:keys [values on-change on-blur show-recent] :as props}]
+  {::mf/wrap-props false}
+  [{:keys [values on-change on-blur show-recent]}]
   (let [{:keys [font-id font-size font-variant-id]} values
 
         font-id         (or font-id (:font-id txt/default-text-attrs))
@@ -371,7 +373,8 @@
 
 
 (mf/defc spacing-options
-  [{:keys [values on-change on-blur] :as props}]
+  {::mf/wrap-props false}
+  [{:keys [values on-change on-blur]}]
   (let [{:keys [line-height
                 letter-spacing]} values
 
@@ -416,7 +419,8 @@
         :on-blur on-blur}]]]))
 
 (mf/defc text-transform-options
-  [{:keys [values on-change on-blur] :as props}]
+  {::mf/wrap-props false}
+  [{:keys [values on-change on-blur]}]
   (let [text-transform (or (:text-transform values) "none")
         handle-change
         (fn [_ type]
@@ -446,6 +450,7 @@
       i/titlecase]]))
 
 (mf/defc typography-options
+  {::mf/wrap-props false}
   [{:keys [ids editor values on-change on-blur show-recent]}]
   (let [opts #js {:editor editor
                   :ids ids
@@ -460,20 +465,13 @@
      [:div.row-flex
       [:> text-transform-options opts]]]))
 
-
-;; TODO: this need to be refactored, right now combines too much logic
-;; and has a dropdown that behaves like a modal but is not a modal.
-;; In summary, this need to a good UX/UI/IMPL rework.
-
-;; FIXME: breaks react hooks rules with open?
 (mf/defc typography-entry
   {::mf/wrap-props false}
-  [{:keys [typography local? selected? on-click on-change on-detach on-context-menu editing? focus-name? #_file external-open*]}]
+  [{:keys [file-id typography local? selected? on-click on-change on-detach on-context-menu editing? focus-name? external-open*]}]
   (let [hover-detach*        (mf/use-state false)
         hover-detach?        (deref hover-detach*)
 
         name-input-ref       (mf/use-ref)
-        ;; on-change-ref        (mf/use-ref nil)
         read-only?           (mf/use-ctx ctx/workspace-read-only?)
         editable?            (and local? (not read-only?))
 
@@ -499,6 +497,14 @@
 
         on-close
         (mf/use-fn #(reset! open* false))
+
+        navigate-to-library
+        (mf/use-fn
+         (mf/deps file-id)
+         (fn []
+           (when file-id
+             (st/emit! (dw/navigate-to-library file-id)))))
+
         ]
 
     (mf/with-effect [editing?]
@@ -515,9 +521,6 @@
          #(when-let [node (mf/ref-val name-input-ref)]
             (dom/focus! node)
             (dom/select-text! node)))))
-
-    ;; (mf/with-effect [on-change]
-    ;;   (mf/set-ref-val! on-change-ref {:on-change on-change}))
 
     [:*
      [:div.element-set-options-group.typography-entry
@@ -596,14 +599,10 @@
           [:span.label (tr "workspace.assets.typography.text-transform")]
           [:span (:text-transform typography)]]
 
-         ;; FIXME: this is the unique reason why we receive a complete file here, looks not reasonable tradeoff
-         #_(when-not local?
+         (when-not local?
            [:div.row-flex
             [:a.go-to-lib-button
-             {:on-click #(st/emit! (rt/nav-new-window* {:rname :workspace
-                                                        :path-params {:project-id (:project-id file)
-                                                                      :file-id (:id file)}
-                                                        :query-params {:page-id (get-in file [:data :pages 0])}}))}
+             {:on-click navigate-to-library}
              (tr "workspace.assets.typography.go-to-edit")]])]
 
         )]]))

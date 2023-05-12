@@ -1338,7 +1338,6 @@
          (fn [name]
            (st/emit! (dwl/rename-color file-id color-id name))))
 
-        ;; FIXME: revisit this
         edit-color
         (mf/use-fn
          (mf/deps color file-id)
@@ -1743,18 +1742,19 @@
 
 (mf/defc typography-item
   {::mf/wrap-props false}
-  [{:keys [typography file local? handle-change selected apply-typography
-           editing-id on-asset-click on-context-menu selected-full
-           selected-paths move-typography rename?]}]
-  (let [item-ref   (mf/use-ref)
+  [{:keys [typography file-id local? handle-change selected apply-typography editing-id on-asset-click
+           on-context-menu selected-full selected-paths move-typography rename?]}]
+  (let [item-ref      (mf/use-ref)
+        typography-id (:id typography)
 
-        dragging*  (mf/use-state false)
-        dragging?  (deref dragging*)
+        dragging*     (mf/use-state false)
+        dragging?     (deref dragging*)
 
-        read-only? (mf/use-ctx ctx/workspace-read-only?)
-        editing?   (= editing-id (:id typography))
+        read-only?    (mf/use-ctx ctx/workspace-read-only?)
+        editing?      (= editing-id (:id typography))
 
-        open?      (mf/use-state editing?)
+        open*         (mf/use-state editing?)
+        open?         (deref open*)
 
         on-drop
         (mf/use-fn
@@ -1783,9 +1783,6 @@
              (dom/prevent-default event)
              (on-asset-drag-start event typography selected item-ref :typographies identity))))
 
-
-        typography-id (:id typography)
-
         on-context-menu
         (mf/use-fn
          (mf/deps on-context-menu typography-id)
@@ -1809,7 +1806,7 @@
         ]
 
     [:div.typography-container {:ref item-ref
-                                :draggable (and (not read-only?) (not @open?))
+                                :draggable (and (not read-only?) (not open?))
                                 :on-drag-start on-typography-drag-start
                                 :on-drag-enter on-drag-enter
                                 :on-drag-leave on-drag-leave
@@ -1824,7 +1821,9 @@
        :on-click on-asset-click
        :editing? editing?
        :focus-name? rename?
-       :open? open?}]
+       :external-open* open*
+       :file-id file-id
+       }]
 
      (when ^boolean dragging?
        [:div.dragging])]))
@@ -1893,7 +1892,7 @@
            (for [{:keys [id] :as typography} typographies]
              [:& typography-item {:typography typography
                                   :key (dm/str "typography-" id)
-                                  :file file
+                                  :file-id file-id
                                   :local? local?
                                   :handle-change handle-change
                                   :selected selected
