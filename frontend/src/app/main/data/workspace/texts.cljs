@@ -321,6 +321,25 @@
                           (cph/group-shape? shape) (cph/get-children-ids objects id))]
           (rx/of (dch/update-shapes shape-ids #(update-text-content % update-node? d/txt-merge attrs))))))))
 
+
+(defn apply-typography
+  "Apply typography to a concrete to currently selected shapes"
+  [typography file-id]
+  (ptk/reify ::apply-typography
+    ptk/WatchEvent
+    (watch [_ state _]
+      (let [editor-state (:workspace-editor-state state)
+            selected     (wsh/lookup-selected state)
+            attrs        (-> typography
+                             (assoc :typography-ref-file file-id)
+                             (assoc :typography-ref-id (:id typography))
+                             (dissoc :id :name))]
+
+        (->> (rx/from (seq selected))
+             (rx/map (fn [id]
+                       (let [editor (get editor-state id)]
+                         (update-text-attrs {:id id :editor editor :attrs attrs})))))))))
+
 (defn migrate-node
   [node]
   (let [color-attrs (select-keys node [:fill-color :fill-opacity :fill-color-ref-id :fill-color-ref-file :fill-color-gradient])]

@@ -467,13 +467,18 @@
 
 ;; FIXME: breaks react hooks rules with open?
 (mf/defc typography-entry
-  [{:keys [typography local? selected? on-click on-change on-detach on-context-menu editing? focus-name? file open?]}]
-  (let [hover-detach         (mf/use-state false)
+  {::mf/wrap-props false}
+  [{:keys [typography local? selected? on-click on-change on-detach on-context-menu editing? focus-name? #_file external-open*]}]
+  (let [hover-detach*        (mf/use-state false)
+        hover-detach?        (deref hover-detach*)
+
         name-input-ref       (mf/use-ref)
-        on-change-ref        (mf/use-ref nil)
-        workspace-read-only? (mf/use-ctx ctx/workspace-read-only?)
-        editable?            (and local? (not workspace-read-only?))
-        open?                (if (nil? open?) (mf/use-state editing?) open?)
+        ;; on-change-ref        (mf/use-ref nil)
+        read-only?           (mf/use-ctx ctx/workspace-read-only?)
+        editable?            (and local? (not read-only?))
+
+        open*                (mf/use-state editing?)
+        open?                (deref open*)
 
         on-name-blur
         (mf/use-callback
@@ -481,11 +486,28 @@
          (fn [event]
            (let [name (dom/get-target-val event)]
              (when-not (str/blank? name)
-               (on-change {:name name})))))]
+               (on-change {:name name})))))
+
+        on-pointer-enter
+        (mf/use-fn #(reset! hover-detach* true))
+
+        on-pointer-leave
+        (mf/use-fn #(reset! hover-detach* false))
+
+        on-open
+        (mf/use-fn #(reset! open* true))
+
+        on-close
+        (mf/use-fn #(reset! open* false))
+        ]
 
     (mf/with-effect [editing?]
       (when editing?
-        (reset! open? editing?)))
+        (reset! open* editing?)))
+
+    (mf/with-effect [open?]
+      (when (some? external-open*)
+        (reset! external-open* open?)))
 
     (mf/with-effect [focus-name?]
       (when focus-name?
@@ -494,15 +516,15 @@
             (dom/focus! node)
             (dom/select-text! node)))))
 
-    (mf/with-effect [on-change]
-      (mf/set-ref-val! on-change-ref {:on-change on-change}))
+    ;; (mf/with-effect [on-change]
+    ;;   (mf/set-ref-val! on-change-ref {:on-change on-change}))
 
     [:*
      [:div.element-set-options-group.typography-entry
-      {:class (when selected? "selected")
-       :style {:display (when @open? "none")}}
+      {:class (when ^boolean selected? "selected")
+       :style {:display (when ^boolean open? "none")}}
       [:div.typography-selection-wrapper
-       {:class (when on-click "is-selectable")
+       {:class (when ^boolean on-click "is-selectable")
         :on-click on-click
         :on-context-menu on-context-menu}
        [:div.typography-sample
@@ -512,20 +534,36 @@
         (tr "workspace.assets.typography.sample")]
        [:div.typography-name (:name typography)]]
       [:div.element-set-actions
-       (when on-detach
+       (when ^boolean on-detach
          [:div.element-set-actions-button
-          {:on-pointer-enter #(reset! hover-detach true)
-           :on-pointer-leave #(reset! hover-detach false)
+          {:on-pointer-enter on-pointer-enter
+           :on-pointer-leave on-pointer-leave
            :on-click on-detach}
-          (if @hover-detach i/unchain i/chain)])
+          (if ^boolean hover-detach? i/unchain i/chain)])
 
        [:div.element-set-actions-button
-        {:on-click #(reset! open? true)}
+        {:on-click on-open}
         i/actions]]]
 
-     [:& advanced-options {:visible? @open?
-                           :on-close #(reset! open? false)}
-      (if (not editable?)
+     [:& advanced-options {:visible? open? :on-close on-close}
+      (if ^boolean editable?
+        [:*
+         [:div.element-set-content
+          [:div.row-flex
+           [:input.element-name.adv-typography-name
+            {:type "text"
+             :ref name-input-ref
+             :default-value (:name typography)
+             :on-blur on-name-blur}]
+
+           [:div.element-set-actions-button
+            {:on-click on-close}
+            i/actions]]]
+
+         [:& typography-options {:values typography
+                                 :on-change on-change
+                                 :show-recent false}]]
+
         [:div.element-set-content.typography-read-only-data
          [:div.row-flex.typography-name
           [:span (:name typography)]]
@@ -535,7 +573,7 @@
           [:span (:font-id typography)]]
 
          [:div.element-set-actions-button.actions-inside
-          {:on-click #(reset! open? false)}
+          {:on-click on-close}
           i/actions]
 
          [:div.row-flex
@@ -559,7 +597,7 @@
           [:span (:text-transform typography)]]
 
          ;; FIXME: this is the unique reason why we receive a complete file here, looks not reasonable tradeoff
-         (when-not local?
+         #_(when-not local?
            [:div.row-flex
             [:a.go-to-lib-button
              {:on-click #(st/emit! (rt/nav-new-window* {:rname :workspace
@@ -568,19 +606,4 @@
                                                         :query-params {:page-id (get-in file [:data :pages 0])}}))}
              (tr "workspace.assets.typography.go-to-edit")]])]
 
-        [:*
-         [:div.element-set-content
-          [:div.row-flex
-           [:input.element-name.adv-typography-name
-            {:type "text"
-             :ref name-input-ref
-             :default-value (:name typography)
-             :on-blur on-name-blur}]
-
-             [:div.element-set-actions-button
-              {:on-click #(reset! open? false)}
-             i/actions]]]
-
-         [:& typography-options {:values typography
-                                 :on-change on-change
-                                 :show-recent false}]])]]))
+        )]]))

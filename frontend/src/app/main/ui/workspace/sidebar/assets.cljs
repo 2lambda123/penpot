@@ -73,13 +73,12 @@
 (def ref:open-status
   (l/derived :workspace-assets-open-status st/state))
 
-(def typography-data
-  (l/derived #(dm/select-keys % [:rename-typography :edit-typography])
-             refs/workspace-global =))
-
-(defn get-list
-  []
-  #js [2 3 4])
+(def ref:typography-section-state
+  (l/derived (fn [gstate]
+               {:rename-typography (:rename-typography gstate)
+                :edit-typography (:edit-typography gstate)})
+             refs/workspace-global
+             =))
 
 (defn create-file-library-ref
   [library-id]
@@ -96,13 +95,12 @@
 
 (defn create-file-colors-ref
   [id]
-  (let [[a b c] (get-list)]
-    (l/derived (fn [state]
-                 (let [wfile (:workspace-data state)]
-                   (if (= (:id wfile) id)
-                     (vals (get wfile :colors))
-                     (vals (dm/get-in state [:workspace-libraries id :data :colors])))))
-               st/state =)))
+  (l/derived (fn [state]
+               (let [wfile (:workspace-data state)]
+                 (if (= (:id wfile) id)
+                   (vals (get wfile :colors))
+                   (vals (dm/get-in state [:workspace-libraries id :data :colors])))))
+             st/state =))
 
 (defn file-media-ref
   [id]
@@ -1728,9 +1726,9 @@
 ;; ---- Typography box ----
 
 (mf/defc typography-item
-  [{:keys [typography file local? handle-change selected-typographies apply-typography
-           editing-id local-data on-asset-click on-context-menu selected-typographies-full
-           selected-typographies-paths move-typography] :as props}]
+  [{:keys [typography file local? handle-change selected apply-typography
+           editing-id local-data on-asset-click on-context-menu selected-full
+           selected-paths move-typography] :as props}]
   (let [item-ref   (mf/use-ref)
 
         dragging*  (mf/use-state false)
@@ -1738,20 +1736,21 @@
 
         read-only? (mf/use-ctx ctx/workspace-read-only?)
         editing?   (= editing-id (:id typography))
+
         open?      (mf/use-state editing?)
 
         on-drop
         (mf/use-fn
-         (mf/deps typography dragging* selected-typographies selected-typographies-full selected-typographies-paths move-typography)
+         (mf/deps typography dragging* selected selected-full selected-paths move-typography)
          (fn [event]
-           (on-drop-asset event typography dragging* selected-typographies selected-typographies-full
-                          selected-typographies-paths move-typography)))
+           (on-drop-asset event typography dragging* selected selected-full
+                          selected-paths move-typography)))
 
         on-drag-enter
         (mf/use-fn
-         (mf/deps typography dragging* selected-typographies selected-typographies-paths)
+         (mf/deps typography dragging* selected selected-paths)
          (fn [event]
-           (on-drag-enter-asset event typography dragging* selected-typographies selected-typographies-paths)))
+           (on-drag-enter-asset event typography dragging* selected selected-paths)))
 
         on-drag-leave
         (mf/use-fn
@@ -1761,11 +1760,32 @@
 
         on-typography-drag-start
         (mf/use-fn
-         (mf/deps typography selected-typographies item-ref read-only?)
+         (mf/deps typography selected item-ref read-only?)
          (fn [event]
            (if read-only?
              (dom/prevent-default event)
-             (on-asset-drag-start event typography selected-typographies item-ref :typographies identity))))]
+             (on-asset-drag-start event typography selected item-ref :typographies identity))))
+
+
+        typography-id (:id typography)
+
+        on-context-menu
+        (mf/use-fn
+         (mf/deps on-context-menu typography-id)
+         (partial on-context-menu typography-id))
+
+        handle-change
+        (mf/use-fn
+         (mf/deps typography)
+         (partial handle-change typography))
+
+        on-asset-click
+        (mf/use-fn
+         (mf/deps typography)
+         #(on-asset-click % typography-id (partial apply-typography typography)))
+
+
+        ]
 
     [:div.typography-container {:ref item-ref
                                 :draggable (and (not read-only?) (not @open?))
@@ -1775,32 +1795,31 @@
                                 :on-drag-over dom/prevent-default
                                 :on-drop on-drop}
      [:& typography-entry
-      {:key (:id typography)
+      {:key (dm/str (:id typography))
        :typography typography
-       :file file
+       ;; :file file
        :local? local?
-       :on-context-menu #(on-context-menu (:id typography) %)
-       :on-change #(handle-change typography %)
-       :selected? (contains? selected-typographies (:id typography))
-       :on-click  #(on-asset-click % (:id typography)
-                                   (partial apply-typography typography))
+       :on-context-menu on-context-menu
+       :on-change handle-change
+       :selected? (contains? selected typography-id)
+       :on-click on-asset-click
        :editing? editing?
-       :focus-name? (= (:rename-typography local-data) (:id typography))
+       :focus-name? (= (:rename-typography local-data) typography-id)
        :open? open?}]
 
      (when ^boolean dragging?
        [:div.dragging])]))
 
 (mf/defc typographies-group
-  [{:keys [file-id prefix groups open-groups file local? selected-typographies local-data
+  [{:keys [file-id prefix groups open-groups file local? selected local-data
            editing-id on-asset-click handle-change apply-typography on-rename-group
-           on-ungroup on-context-menu selected-typographies-full]}]
+           on-ungroup on-context-menu selected-full]}]
   (let [group-open? (get open-groups prefix true)
 
         dragging*   (mf/use-state false)
         dragging?   (deref dragging*)
 
-        selected-typographies-paths (->> selected-typographies-full
+        selected-paths (->> selected-full
                                          (map #(:path %))
                                          (map #(if (nil? %) "" %)))
 
@@ -1808,9 +1827,9 @@
 
         on-drag-enter
         (mf/use-fn
-         (mf/deps dragging* prefix selected-typographies-paths)
+         (mf/deps dragging* prefix selected-paths)
          (fn [event]
-           (on-drag-enter-asset-group event dragging* prefix selected-typographies-paths)))
+           (on-drag-enter-asset-group event dragging* prefix selected-paths)))
 
         on-drag-leave
         (mf/use-fn
@@ -1820,9 +1839,9 @@
 
         on-drop
         (mf/use-fn
-         (mf/deps dragging* prefix selected-typographies-paths selected-typographies-full move-typography)
+         (mf/deps dragging* prefix selected-paths selected-full move-typography)
          (fn [event]
-           (on-drop-asset-group event dragging* prefix selected-typographies-paths selected-typographies-full move-typography)))]
+           (on-drop-asset-group event dragging* prefix selected-paths selected-full move-typography)))]
 
     [:div {:on-drag-enter on-drag-enter
            :on-drag-leave on-drag-leave
@@ -1855,14 +1874,14 @@
                                   :file file
                                   :local? local?
                                   :handle-change handle-change
-                                  :selected-typographies selected-typographies
+                                  :selected selected
                                   :apply-typography apply-typography
                                   :editing-id editing-id
                                   :local-data local-data
                                   :on-asset-click on-asset-click
                                   :on-context-menu on-context-menu
-                                  :selected-typographies-full selected-typographies-full
-                                  :selected-typographies-paths selected-typographies-paths
+                                  :selected-full selected-full
+                                  :selected-paths selected-paths
                                   :move-typography move-typography}])])
 
         (for [[path-item content] groups]
@@ -1874,7 +1893,7 @@
                                     :open-groups open-groups
                                     :file file
                                     :local? local?
-                                    :selected-typographies selected-typographies
+                                    :selected selected
                                     :editing-id editing-id
                                     :local-data local-data
                                     :on-asset-click on-asset-click
@@ -1883,57 +1902,70 @@
                                     :on-rename-group on-rename-group
                                     :on-ungroup on-ungroup
                                     :on-context-menu on-context-menu
-                                    :selected-typographies-full selected-typographies-full}]))])]))
+                                    :selected-full selected-full}]))])]))
 
 (mf/defc typographies-box
-  [{:keys [file file-id local? typographies open? open-groups selected-assets reverse-sort?
+  [{:keys [file file-id local? typographies open? open-status-ref selected-assets reverse-sort?
            on-asset-click on-assets-delete on-clear-selection] :as props}]
-  (let [state (mf/use-state {:detail-open? false
-                             :id nil})
+  (let [state         (mf/use-state {:detail-open? false :id nil})
+        local-data    (mf/deref ref:typography-section-state)
 
-        local-data (mf/deref typography-data)
-        menu-state (mf/use-state auto-pos-menu-state)
-        typographies (->> typographies
-                          (map dwl/extract-path-if-missing))
 
-        groups     (group-assets typographies reverse-sort?)
+        read-only?    (mf/use-ctx ctx/workspace-read-only?)
+        menu-state    (mf/use-state auto-pos-menu-state)
+        typographies  (mf/with-memo [typographies]
+                        (mapv dwl/extract-path-if-missing typographies))
 
-        selected-typographies (:typographies selected-assets)
-        selected-typographies-full (filter #(contains? selected-typographies (:id %)) typographies)
-        multi-typographies?   (> (count selected-typographies) 1)
-        multi-assets?         (or (seq (:components selected-assets))
-                                  (seq (:graphics selected-assets))
-                                  (seq (:colors selected-assets)))
-        read-only?            (mf/use-ctx ctx/workspace-read-only?)
+        groups        (mf/with-memo [typographies reverse-sort?]
+                        (group-assets typographies reverse-sort?))
 
-        text-shapes (->>
-                     (mf/deref refs/selected-objects)
-                     (filter #(= (:type %) :text)))
+        selected      (:typographies selected-assets)
+        selected-full (mf/with-memo [selected typographies]
+                        (into #{} (filter #(contains? selected (:id %))) typographies))
 
-        state-map (mf/deref refs/workspace-editor-state)
-        text-shape (first text-shapes)
-        editor-state (get state-map (:id text-shape))
+        multi-typographies?  (> (count selected) 1)
+        multi-assets?        (or (seq (:components selected-assets))
+                                 (seq (:graphics selected-assets))
+                                 (seq (:colors selected-assets)))
 
-        text-values (dwt/current-text-values
-                      {:editor-state editor-state
-                       :shape text-shape
-                       :attrs dwt/text-attrs})
+        open-groups-ref      (mf/with-memo [open-status-ref]
+                               (-> (l/in [:groups :components])
+                                   (l/derived open-status-ref)))
 
-        multiple? (or (> 1 (count text-shape))
-                    (->> text-values vals (d/seek #(= % :multiple))))
+        open-groups          (mf/deref open-groups-ref)
 
-        values (-> (d/without-nils text-values)
-                   (select-keys
-                     (d/concat-vec dwt/text-font-attrs
-                       dwt/text-spacing-attrs
-                       dwt/text-transform-attrs)))
+        ;; FIXME: revisit if we really need reactivity here
+        selected-objects     (mf/deref refs/selected-objects)
+        text-shapes          (mf/with-memo [selected-objects]
+                               (into #{} (filter cph/text-shape?) selected-objects))
+
+        ;; FIXME: revisit if we really need reactivity here
+        editor-state         (mf/deref refs/workspace-editor-state)
+        text-shape           (first text-shapes)
+        editor-state         (get editor-state (:id text-shape))
+
+        ;; FIXME: maybe we need memo here?
+        text-values          (dwt/current-text-values
+                              {:editor-state editor-state
+                               :shape text-shape
+                               :attrs dwt/text-attrs})
+
+        multiple?            (or (> 1 (count text-shape))
+                                 (d/seek (partial = :multiple)
+                                         (vals text-values)))
+
+        values               (-> (d/without-nils text-values)
+                                 (select-keys
+                                  (d/concat-vec dwt/text-font-attrs
+                                                dwt/text-spacing-attrs
+                                                dwt/text-transform-attrs)))
 
         typography-id (uuid/next)
-        typography (-> (if multiple?
-                         txt/default-typography
-                         (merge txt/default-typography values))
-                       (generate-typography-name)
-                       (assoc :id typography-id))
+        typography    (-> (if multiple?
+                            txt/default-typography
+                            (merge txt/default-typography values))
+                          (generate-typography-name)
+                          (assoc :id typography-id))
 
         add-typography
         (mf/use-fn
@@ -1954,22 +1986,14 @@
            (st/emit! (dwl/update-typography (merge typography changes) file-id))))
 
         apply-typography
-        (fn [typography _event]
-          (let [ids (wsh/lookup-selected @st/state)
-                attrs (merge
-                       {:typography-ref-file file-id
-                        :typography-ref-id (:id typography)}
-                       (dissoc typography :id :name))]
-            (run! #(st/emit!
-                    (dwt/update-text-attrs
-                     {:id %
-                      :editor (get @refs/workspace-editor-state %)
-                      :attrs attrs}))
-                  ids)))
+        (mf/use-fn
+         (mf/deps file-id)
+         (fn [typography _event]
+           (st/emit! (dwt/apply-typography typography file-id))))
 
         create-group
         (mf/use-fn
-         (mf/deps typographies selected-typographies on-clear-selection file-id)
+         (mf/deps typographies selected on-clear-selection file-id)
          (fn [group-name]
            (on-clear-selection)
            (let [undo-id (js/Symbol)]
@@ -1977,7 +2001,7 @@
              (run! st/emit!
                    (->> typographies
                         (filter #(if multi-typographies?
-                                   (contains? selected-typographies (:id %))
+                                   (contains? selected (:id %))
                                    (= (:id @state) (:id %))))
                         (map #(dwl/update-typography
                                (assoc % :name
@@ -2003,7 +2027,7 @@
 
         on-group
         (mf/use-fn
-         (mf/deps typographies selected-typographies)
+         (mf/deps typographies selected)
          (fn [event]
            (dom/stop-propagation event)
            (modal/show! :name-group-dialog {:accept create-group})))
@@ -2034,10 +2058,10 @@
 
         on-context-menu
         (mf/use-fn
-         (mf/deps selected-typographies on-clear-selection read-only?)
+         (mf/deps selected on-clear-selection read-only?)
          (fn [id event]
            (when (and local? (not read-only?))
-             (when-not (contains? selected-typographies id)
+             (when-not (contains? selected id)
                (on-clear-selection))
              (swap! state assoc :id id)
              (swap! menu-state #(open-auto-pos-menu % event)))))
@@ -2097,7 +2121,7 @@
                               :state state
                               :file file
                               :local? local?
-                              :selected-typographies selected-typographies
+                              :selected selected
                               :editing-id editing-id
                               :local-data local-data
                               :on-asset-click (partial on-asset-click groups)
@@ -2106,7 +2130,7 @@
                               :on-rename-group on-rename-group
                               :on-ungroup on-ungroup
                               :on-context-menu on-context-menu
-                              :selected-typographies-full selected-typographies-full}]
+                              :selected-full selected-full}]
 
       (when local?
         [:& auto-pos-menu
@@ -2381,14 +2405,14 @@
          :on-assets-delete on-assets-delete
          :on-clear-selection on-clear-selection}])
 
-     #_(when ^boolean show-typography?
+     (when ^boolean show-typography?
        [:& typographies-box
         {:file file
          :file-id (:id file)
          :local? local?
          :typographies typographies
-         :open? (open-box? :typographies)
-         :open-groups (open-groups :typographies)
+         :open? (get open-status :components true)
+         :open-status-ref open-status-ref
          :reverse-sort? reverse-sort?
          :selected-assets selected-assets
          :on-asset-click on-typography-click
